@@ -2,6 +2,10 @@
 
 Find home games where your favorite opposing starting pitchers are likely to pitch — and buy tickets directly from MLB.com.
 
+**Try it live:** [mlb-probable-starters-production.up.railway.app](https://mlb-probable-starters-production.up.railway.app/)
+
+![MLB Home Game Pitcher Tracker](docs/screenshot.png)
+
 ## How It Works
 
 1. **Pick your home team** (e.g., San Francisco Giants)
