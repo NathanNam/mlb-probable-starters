@@ -79,3 +79,20 @@ export interface MatchedGame {
   confidence: MatchConfidence;
   homePitcher?: { fullName: string }; // home team's probable starter
 }
+
+export interface RotationStart {
+  date: string; // YYYY-MM-DD
+  opponent: string;
+  isHome: boolean;
+}
+
+export interface RotationInfo {
+  pitcherId: number;
+  pitcherName: string;
+  pitchHand: string;
+  teamName: string;
+  starts: RotationStart[];
+  avgGap: number;
+  nextProjectedStart: string; // YYYY-MM-DD
+  totalStarts: number;
+}

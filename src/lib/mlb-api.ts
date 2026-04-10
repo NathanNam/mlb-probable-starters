@@ -1,7 +1,7 @@
 const MLB_API_BASE = "https://statsapi.mlb.com/api/v1";
 
-async function mlbFetch(path: string): Promise<Response> {
-  const res = await fetch(`${MLB_API_BASE}${path}`, { next: { revalidate: 3600 } });
+async function mlbFetch(path: string, revalidate = 3600): Promise<Response> {
+  const res = await fetch(`${MLB_API_BASE}${path}`, { next: { revalidate } });
   if (!res.ok) {
     throw new Error(`MLB API error: ${res.status} ${res.statusText} for ${path}`);
   }
@@ -54,7 +54,8 @@ export async function fetchSchedule(teamId: number, season: number) {
   const startDate = `${season}-03-01`;
   const endDate = `${season}-10-10`;
   const res = await mlbFetch(
-    `/schedule?sportId=1&teamId=${teamId}&season=${season}&gameType=R&hydrate=probablePitcher(note)&startDate=${startDate}&endDate=${endDate}`
+    `/schedule?sportId=1&teamId=${teamId}&season=${season}&gameType=R&hydrate=probablePitcher(note)&startDate=${startDate}&endDate=${endDate}`,
+    300 // 5 min — probable pitchers update frequently
   );
   const data = await res.json();
   const games: Array<{
@@ -85,7 +86,8 @@ export async function fetchSchedule(teamId: number, season: number) {
 
 export async function fetchGameLog(playerId: number, season: number) {
   const res = await mlbFetch(
-    `/people/${playerId}/stats?stats=gameLog&group=pitching&season=${season}`
+    `/people/${playerId}/stats?stats=gameLog&group=pitching&season=${season}`,
+    300 // 5 min — game logs update after each game
   );
   const data = await res.json();
   const splits =

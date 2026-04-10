@@ -13,6 +13,15 @@ Find home games where your favorite opposing starting pitchers are likely to pit
 3. **View projected home games** where those pitchers are expected to start, with confidence levels
 4. **Click a game** to open its MLB.com page and purchase tickets
 
+### Rotation Patterns
+
+Each selected pitcher shows a rotation pattern card with:
+
+- Recent starts timeline (last 5 starts with dates, opponents, and home/away)
+- Average rotation gap (e.g., "Every 5 days")
+- Next projected start date
+- Total starts this season
+
 ### Pitcher Rotation Projection
 
 The app uses a series-based projection algorithm:
@@ -74,6 +83,7 @@ src/
     ├── PitcherSearch.tsx           # Debounced search with autocomplete
     ├── PitcherChip.tsx             # Color-coded selected pitcher tag
     ├── ScheduleResults.tsx         # Results list with warnings and legend
+    ├── RotationPattern.tsx         # Pitcher rotation pattern timeline
     └── GameCard.tsx                # Game card linking to MLB.com tickets
 ```
 

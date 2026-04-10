@@ -1,7 +1,8 @@
 "use client";
 
-import type { MatchedGame, SelectedPitcher, PitcherWarning } from "@/lib/types";
+import type { MatchedGame, SelectedPitcher, PitcherWarning, RotationInfo } from "@/lib/types";
 import GameCard from "./GameCard";
+import RotationPattern from "./RotationPattern";
 
 const PITCHER_COLORS = [
   "#2563eb", "#dc2626", "#059669", "#7c3aed",
@@ -20,9 +21,10 @@ interface ScheduleResultsProps {
   teamName: string;
   teamAbbreviation: string;
   pitcherWarnings: Map<number, PitcherWarning>;
+  rotationInfos: RotationInfo[];
 }
 
-export default function ScheduleResults({ games, pitchers, teamName, teamAbbreviation, pitcherWarnings }: ScheduleResultsProps) {
+export default function ScheduleResults({ games, pitchers, teamName, teamAbbreviation, pitcherWarnings, rotationInfos }: ScheduleResultsProps) {
   if (games.length === 0) {
     return (
       <div className="text-center py-12">
@@ -114,6 +116,11 @@ export default function ScheduleResults({ games, pitchers, teamName, teamAbbrevi
             .join(" \u00B7 ")}
         </p>
       </div>
+
+      {/* Rotation patterns */}
+      {rotationInfos.length > 0 && (
+        <RotationPattern rotations={rotationInfos} pitcherIndexMap={pitcherIndexMap} />
+      )}
 
       {/* Games grouped by month */}
       {Array.from(byMonth.entries()).map(([month, monthGames]) => (

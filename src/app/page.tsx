@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import TeamPicker from "@/components/TeamPicker";
 import PitcherSearch from "@/components/PitcherSearch";
 import ScheduleResults from "@/components/ScheduleResults";
-import type { SelectedPitcher, MatchedGame, ScheduleGame, PitcherWarning } from "@/lib/types";
-import { projectPitcherStarts } from "@/lib/projection";
+import type { SelectedPitcher, MatchedGame, ScheduleGame, PitcherWarning, RotationInfo } from "@/lib/types";
+import { projectPitcherStarts, buildRotationInfo } from "@/lib/projection";
 
 interface Team {
   id: number;
@@ -37,6 +37,7 @@ export default function Home() {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [selectedPitchers, setSelectedPitchers] = useState<SelectedPitcher[]>([]);
   const [results, setResults] = useState<MatchedGame[] | null>(null);
+  const [rotationInfos, setRotationInfos] = useState<RotationInfo[]>([]);
   const [pitcherWarnings, setPitcherWarnings] = useState<Map<number, PitcherWarning>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +101,7 @@ export default function Home() {
       );
 
       const allMatches: MatchedGame[] = [];
+      const allRotations: RotationInfo[] = [];
       const warnings = new Map<number, PitcherWarning>();
 
       await Promise.all(
@@ -188,6 +190,10 @@ export default function Home() {
             splits = [...prevSplits, ...splits];
           }
 
+          // Build rotation pattern info from current season data
+          const rotInfo = buildRotationInfo(pitcher, splits, CURRENT_SEASON);
+          allRotations.push(rotInfo);
+
           const matches = projectPitcherStarts(
             homeGames,
             pitcher,
@@ -199,6 +205,7 @@ export default function Home() {
       );
 
       setPitcherWarnings(warnings);
+      setRotationInfos(allRotations);
       setResults(allMatches);
     } catch (err) {
       console.error("Error finding games:", err);
@@ -321,6 +328,7 @@ export default function Home() {
                 teamName={selectedTeam?.name || ""}
                 teamAbbreviation={selectedTeam?.abbreviation || ""}
                 pitcherWarnings={pitcherWarnings}
+                rotationInfos={rotationInfos}
               />
             </section>
           )}

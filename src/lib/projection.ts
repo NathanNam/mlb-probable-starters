@@ -1,4 +1,4 @@
-import type { ScheduleGame, SelectedPitcher, MatchedGame, MatchConfidence } from "./types";
+import type { ScheduleGame, SelectedPitcher, MatchedGame, MatchConfidence, RotationInfo, RotationStart } from "./types";
 
 interface StartEntry {
   date: string; // YYYY-MM-DD
@@ -136,6 +136,46 @@ function makeMatchedGame(
     homePitcher: game.teams.home.probablePitcher
       ? { fullName: game.teams.home.probablePitcher.fullName }
       : undefined,
+  };
+}
+
+/**
+ * Build rotation info for a pitcher from their game log.
+ * Shows recent starts, average gap, and next projected start date.
+ */
+export function buildRotationInfo(
+  pitcher: SelectedPitcher,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  gameLogSplits: any[],
+  season: number
+): RotationInfo {
+  const starts: RotationStart[] = gameLogSplits
+    .filter((s) => s.stat?.gamesStarted === 1 && s.date >= `${season}-01-01`)
+    .map((s) => ({
+      date: s.date,
+      opponent: s.opponent?.name || "Unknown",
+      isHome: s.isHome ?? false,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const startEntries = starts.map((s) => ({ date: s.date }));
+  const avgGap = calculateRotationGap(startEntries);
+
+  let nextProjectedStart = "";
+  if (starts.length >= 1) {
+    const lastStart = starts[starts.length - 1].date;
+    nextProjectedStart = addDays(lastStart, avgGap);
+  }
+
+  return {
+    pitcherId: pitcher.id,
+    pitcherName: pitcher.fullName,
+    pitchHand: pitcher.pitchHand,
+    teamName: pitcher.teamName,
+    starts,
+    avgGap,
+    nextProjectedStart,
+    totalStarts: starts.length,
   };
 }
 
