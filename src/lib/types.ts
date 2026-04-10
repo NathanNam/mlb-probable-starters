@@ -94,5 +94,8 @@ export interface RotationInfo {
   starts: RotationStart[];
   avgGap: number;
   nextProjectedStart: string; // YYYY-MM-DD
+  nextProjectedOpponent?: string; // full team name
+  nextProjectedIsHome?: boolean;
+  nextProjectedConfidence?: MatchConfidence;
   totalStarts: number;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import type { RotationInfo } from "@/lib/types";
+import type { RotationInfo, MatchConfidence } from "@/lib/types";
 
 const PITCHER_COLORS = [
   "#2563eb", "#dc2626", "#059669", "#7c3aed",
@@ -20,6 +20,57 @@ function formatDate(dateStr: string): string {
 function formatDay(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00Z");
   return d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+}
+
+// Two-word MLB nicknames — everything else uses the last word
+const TWO_WORD_NICKNAMES = ["Blue Jays", "Red Sox", "White Sox"];
+
+function shortTeamName(fullName: string): string {
+  for (const nick of TWO_WORD_NICKNAMES) {
+    if (fullName.endsWith(nick)) return nick;
+  }
+  const parts = fullName.split(" ");
+  return parts[parts.length - 1];
+}
+
+interface ProjectedStyle {
+  borderColor: string;
+  borderStyle: "solid" | "dashed";
+  background: string;
+  textColor: string;
+  label: string;
+}
+
+function projectedStyle(
+  confidence: MatchConfidence | undefined,
+  pitcherColor: string
+): ProjectedStyle {
+  if (confidence === "confirmed") {
+    return {
+      borderColor: "#10b981", // green-500
+      borderStyle: "solid",
+      background: "#ecfdf5", // green-50
+      textColor: "#047857", // green-700
+      label: "confirmed",
+    };
+  }
+  if (confidence === "possible") {
+    return {
+      borderColor: "#f59e0b", // amber-500
+      borderStyle: "dashed",
+      background: "#fffbeb", // amber-50
+      textColor: "#b45309", // amber-700
+      label: "possible",
+    };
+  }
+  // Default — projected (or unknown when no schedule)
+  return {
+    borderColor: pitcherColor,
+    borderStyle: "dashed",
+    background: `${pitcherColor}08`,
+    textColor: pitcherColor,
+    label: "projected",
+  };
 }
 
 export default function RotationPattern({ rotations, pitcherIndexMap }: RotationPatternProps) {
@@ -84,7 +135,7 @@ export default function RotationPattern({ rotations, pitcherIndexMap }: Rotation
                           {formatDate(start.date)}
                         </span>
                         <span className="text-[10px] text-gray-500 mt-0.5">
-                          {start.isHome ? "vs" : "@"} {start.opponent.replace(/^(.*?\s)/, "").slice(0, 12)}
+                          {start.isHome ? "vs" : "@"} {shortTeamName(start.opponent)}
                         </span>
                       </div>
                       {i < recentStarts.length - 1 && (
@@ -98,26 +149,41 @@ export default function RotationPattern({ rotations, pitcherIndexMap }: Rotation
                   ))}
 
                   {/* Next projected */}
-                  {rot.nextProjectedStart && (
-                    <>
-                      <div className="flex flex-col items-center mx-0.5">
-                        <svg className="w-3 h-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                      <div className="flex flex-col items-center px-2 py-1.5 rounded-lg min-w-[72px] border border-dashed" style={{ borderColor: color, backgroundColor: `${color}08` }}>
-                        <span className="text-[10px] font-medium text-gray-400">
-                          {formatDay(rot.nextProjectedStart)}
-                        </span>
-                        <span className="text-xs font-semibold" style={{ color }}>
-                          {formatDate(rot.nextProjectedStart)}
-                        </span>
-                        <span className="text-[10px] text-gray-400 mt-0.5">
-                          projected
-                        </span>
-                      </div>
-                    </>
-                  )}
+                  {rot.nextProjectedStart && (() => {
+                    const ps = projectedStyle(rot.nextProjectedConfidence, color);
+                    return (
+                      <>
+                        <div className="flex flex-col items-center mx-0.5">
+                          <svg className="w-3 h-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                        <div
+                          className="flex flex-col items-center px-2 py-1.5 rounded-lg min-w-[72px] border"
+                          style={{
+                            borderColor: ps.borderColor,
+                            borderStyle: ps.borderStyle,
+                            backgroundColor: ps.background,
+                          }}
+                        >
+                          <span className="text-[10px] font-medium text-gray-400">
+                            {formatDay(rot.nextProjectedStart)}
+                          </span>
+                          <span className="text-xs font-semibold" style={{ color: ps.textColor }}>
+                            {formatDate(rot.nextProjectedStart)}
+                          </span>
+                          {rot.nextProjectedOpponent && (
+                            <span className="text-[10px] text-gray-500 mt-0.5">
+                              {rot.nextProjectedIsHome ? "vs" : "@"} {shortTeamName(rot.nextProjectedOpponent)}
+                            </span>
+                          )}
+                          <span className="text-[9px] font-medium uppercase tracking-wide mt-0.5" style={{ color: ps.textColor }}>
+                            {ps.label}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
 

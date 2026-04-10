@@ -190,8 +190,20 @@ export default function Home() {
             splits = [...prevSplits, ...splits];
           }
 
+          // Fetch the pitcher's team schedule so we can show the projected next opponent
+          let pitcherTeamSchedule: ScheduleGame[] | undefined;
+          try {
+            const teamSchedRes = await fetch(
+              `/api/schedule?teamId=${pitcher.teamId}&season=${CURRENT_SEASON}`
+            );
+            const teamSchedData = await teamSchedRes.json();
+            pitcherTeamSchedule = teamSchedData.games || [];
+          } catch {
+            // skip — projected box will fall back to date-only
+          }
+
           // Build rotation pattern info from current season data
-          const rotInfo = buildRotationInfo(pitcher, splits, CURRENT_SEASON);
+          const rotInfo = buildRotationInfo(pitcher, splits, CURRENT_SEASON, pitcherTeamSchedule);
           allRotations.push(rotInfo);
 
           const matches = projectPitcherStarts(

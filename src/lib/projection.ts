@@ -142,12 +142,15 @@ function makeMatchedGame(
 /**
  * Build rotation info for a pitcher from their game log.
  * Shows recent starts, average gap, and next projected start date.
+ * If pitcherTeamSchedule is provided, the projected next start is aligned
+ * to a real scheduled game and the opponent is filled in.
  */
 export function buildRotationInfo(
   pitcher: SelectedPitcher,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   gameLogSplits: any[],
-  season: number
+  season: number,
+  pitcherTeamSchedule?: ScheduleGame[]
 ): RotationInfo {
   const starts: RotationStart[] = gameLogSplits
     .filter((s) => s.stat?.gamesStarted === 1 && s.date >= `${season}-01-01`)
@@ -162,9 +165,68 @@ export function buildRotationInfo(
   const avgGap = calculateRotationGap(startEntries);
 
   let nextProjectedStart = "";
+  let nextProjectedOpponent: string | undefined;
+  let nextProjectedIsHome: boolean | undefined;
+  let nextProjectedConfidence: MatchConfidence | undefined;
+
   if (starts.length >= 1) {
     const lastStart = starts[starts.length - 1].date;
     nextProjectedStart = addDays(lastStart, avgGap);
+
+    // Try to align the projected date to an actual scheduled game
+    if (pitcherTeamSchedule && pitcherTeamSchedule.length > 0) {
+      const futureGames = pitcherTeamSchedule.filter(
+        (g) => g.officialDate > lastStart
+      );
+
+      // Pass 1: look for any future game where MLB has announced THIS pitcher
+      let confirmedGame: ScheduleGame | undefined;
+      for (const game of futureGames) {
+        const isHomeGame = game.teams.home.team.id === pitcher.teamId;
+        const probable = isHomeGame
+          ? game.teams.home.probablePitcher
+          : game.teams.away.probablePitcher;
+        if (probable?.id === pitcher.id) {
+          confirmedGame = game;
+          break; // earliest one
+        }
+      }
+
+      let bestGame: ScheduleGame | undefined;
+      if (confirmedGame) {
+        bestGame = confirmedGame;
+        nextProjectedConfidence = "confirmed";
+      } else {
+        // Pass 2: rotation projection — closest game within ±2 days,
+        // skipping games where another pitcher is already announced
+        let bestDiff = Infinity;
+        for (const game of futureGames) {
+          const isHomeGame = game.teams.home.team.id === pitcher.teamId;
+          const probable = isHomeGame
+            ? game.teams.home.probablePitcher
+            : game.teams.away.probablePitcher;
+          if (probable && probable.id !== pitcher.id) continue;
+
+          const diff = Math.abs(daysBetween(game.officialDate, nextProjectedStart));
+          if (diff < bestDiff && diff <= 2) {
+            bestDiff = diff;
+            bestGame = game;
+          }
+        }
+        if (bestGame) {
+          nextProjectedConfidence = bestDiff <= 1 ? "projected" : "possible";
+        }
+      }
+
+      if (bestGame) {
+        const isHome = bestGame.teams.home.team.id === pitcher.teamId;
+        nextProjectedStart = bestGame.officialDate;
+        nextProjectedOpponent = isHome
+          ? bestGame.teams.away.team.name
+          : bestGame.teams.home.team.name;
+        nextProjectedIsHome = isHome;
+      }
+    }
   }
 
   return {
@@ -175,6 +237,9 @@ export function buildRotationInfo(
     starts,
     avgGap,
     nextProjectedStart,
+    nextProjectedOpponent,
+    nextProjectedIsHome,
+    nextProjectedConfidence,
     totalStarts: starts.length,
   };
 }
