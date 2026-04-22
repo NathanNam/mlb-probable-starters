@@ -26,14 +26,35 @@ interface ScheduleResultsProps {
 
 export default function ScheduleResults({ games, pitchers, teamName, teamAbbreviation, pitcherWarnings, rotationInfos }: ScheduleResultsProps) {
   if (games.length === 0) {
+    // Identify which teams don't visit this home stadium
+    const uniqueTeams = Array.from(
+      new Map(pitchers.map((p) => [p.teamId, p.teamName])).values()
+    );
+
     return (
       <div className="text-center py-12">
         <div className="text-5xl mb-4">&#9918;</div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">No matching games found</h3>
-        <p className="text-gray-500 max-w-sm mx-auto">
-          The selected pitchers&apos; teams may not have home games scheduled against the {teamName},
-          or there isn&apos;t enough data to project their rotation.
-        </p>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">No matching home games found</h3>
+        <div className="text-gray-500 max-w-md mx-auto">
+          {uniqueTeams.length === 1 ? (
+            <p>
+              The <span className="font-medium text-gray-700">{uniqueTeams[0]}</span> don&apos;t
+              visit the {teamName} this regular season. They may only play as an away series at the
+              opponent&apos;s stadium.
+            </p>
+          ) : (
+            <p>
+              The following teams don&apos;t visit the {teamName} this regular season:{" "}
+              {uniqueTeams.map((name, i) => (
+                <span key={name}>
+                  {i > 0 && (i === uniqueTeams.length - 1 ? " and " : ", ")}
+                  <span className="font-medium text-gray-700">{name}</span>
+                </span>
+              ))}
+              . They may only play as away series at the opponents&apos; stadiums.
+            </p>
+          )}
+        </div>
       </div>
     );
   }
