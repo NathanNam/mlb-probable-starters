@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useCallback } from "react";
 import type { RotationInfo, MatchConfidence } from "@/lib/types";
 
 const PITCHER_COLORS = [
@@ -73,6 +74,25 @@ function projectedStyle(
   };
 }
 
+function ScrollToEnd({ className, children }: { className?: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const scrollToEnd = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      node.scrollLeft = node.scrollWidth;
+    }
+  }, []);
+
+  useEffect(() => {
+    scrollToEnd(ref.current);
+  }, [scrollToEnd]);
+
+  return (
+    <div ref={(node) => { ref.current = node; scrollToEnd(node); }} className={className}>
+      {children}
+    </div>
+  );
+}
+
 export default function RotationPattern({ rotations, pitcherIndexMap }: RotationPatternProps) {
   if (rotations.length === 0) return null;
 
@@ -124,7 +144,7 @@ export default function RotationPattern({ rotations, pitcherIndexMap }: Rotation
 
               {/* Recent starts timeline */}
               {recentStarts.length > 0 && (
-                <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                <ScrollToEnd className="flex items-center gap-1 overflow-x-auto pb-1">
                   {recentStarts.map((start, i) => (
                     <div key={start.date} className="flex items-center">
                       <div className="flex flex-col items-center px-2 py-1.5 rounded-lg bg-gray-50 min-w-[72px]">
@@ -184,7 +204,7 @@ export default function RotationPattern({ rotations, pitcherIndexMap }: Rotation
                       </>
                     );
                   })()}
-                </div>
+                </ScrollToEnd>
               )}
 
               {recentStarts.length === 0 && (
