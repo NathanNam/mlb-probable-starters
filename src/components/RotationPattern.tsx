@@ -1,12 +1,9 @@
 "use client";
 
+import { pitcherColor } from "@/lib/teams";
 import { useEffect, useRef, useCallback } from "react";
 import type { RotationInfo, MatchConfidence } from "@/lib/types";
 
-const PITCHER_COLORS = [
-  "#2563eb", "#dc2626", "#059669", "#7c3aed",
-  "#d97706", "#0891b2", "#be185d", "#4f46e5",
-];
 
 interface RotationPatternProps {
   rotations: RotationInfo[];
@@ -44,7 +41,7 @@ interface ProjectedStyle {
 
 function projectedStyle(
   confidence: MatchConfidence | undefined,
-  pitcherColor: string
+  color: string
 ): ProjectedStyle {
   if (confidence === "confirmed") {
     return {
@@ -66,10 +63,10 @@ function projectedStyle(
   }
   // Default — projected (or unknown when no schedule)
   return {
-    borderColor: pitcherColor,
+    borderColor: color,
     borderStyle: "dashed",
-    background: `${pitcherColor}08`,
-    textColor: pitcherColor,
+    background: `${color}08`,
+    textColor: color,
     label: "projected",
   };
 }
@@ -104,7 +101,7 @@ export default function RotationPattern({ rotations, pitcherIndexMap }: Rotation
       <div className="flex flex-col gap-3">
         {rotations.map((rot) => {
           const colorIdx = pitcherIndexMap.get(rot.pitcherId) ?? 0;
-          const color = PITCHER_COLORS[colorIdx % PITCHER_COLORS.length];
+          const color = pitcherColor(colorIdx);
           const recentStarts = rot.starts.slice(-5); // last 5 starts
 
           return (

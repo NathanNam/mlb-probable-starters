@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchSchedule } from "@/lib/mlb-api";
+import { seasonFromDate, todayET } from "@/lib/dates";
 
 export async function GET(request: NextRequest) {
   const teamId = request.nextUrl.searchParams.get("teamId");
-  const season = request.nextUrl.searchParams.get("season") || "2026";
+  const season = request.nextUrl.searchParams.get("season") || String(seasonFromDate(todayET()));
 
   if (!teamId) {
     return NextResponse.json({ error: "teamId is required" }, { status: 400 });

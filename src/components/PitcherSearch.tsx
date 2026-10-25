@@ -1,5 +1,6 @@
 "use client";
 
+import { pitcherColor } from "@/lib/teams";
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { SelectedPitcher } from "@/lib/types";
 import PitcherChip from "./PitcherChip";
@@ -11,16 +12,6 @@ interface SearchResult {
   currentTeam?: { id: number; name: string };
 }
 
-const PITCHER_COLORS = [
-  "#2563eb", // blue
-  "#dc2626", // red
-  "#059669", // emerald
-  "#7c3aed", // violet
-  "#d97706", // amber
-  "#0891b2", // cyan
-  "#be185d", // pink
-  "#4f46e5", // indigo
-];
 
 interface PitcherSearchProps {
   selectedPitchers: SelectedPitcher[];
@@ -51,6 +42,7 @@ export default function PitcherSearch({
     setLoading(true);
     try {
       const res = await fetch(`/api/players/search?q=${encodeURIComponent(q)}`);
+      if (!res.ok) throw new Error(`search failed: ${res.status}`);
       const data = await res.json();
       setResults(data.players || []);
       setIsOpen(true);
@@ -78,6 +70,7 @@ export default function PitcherSearch({
     if (!teamId) {
       try {
         const res = await fetch(`/api/player/${result.id}`);
+        if (!res.ok) throw new Error(`player lookup failed: ${res.status}`);
         const data = await res.json();
         teamId = data.player?.currentTeam?.id;
         teamName = data.player?.currentTeam?.name;
@@ -143,7 +136,7 @@ export default function PitcherSearch({
               key={p.id}
               pitcher={p}
               onRemove={onRemove}
-              color={PITCHER_COLORS[i % PITCHER_COLORS.length]}
+              color={pitcherColor(i)}
             />
           ))}
         </div>

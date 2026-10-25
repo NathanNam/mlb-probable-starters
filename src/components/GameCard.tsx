@@ -1,11 +1,9 @@
 "use client";
 
+import { pitcherColor } from "@/lib/teams";
+import { formatGameTime } from "@/lib/dates";
 import type { MatchedGame, MatchConfidence, PitcherWarning } from "@/lib/types";
 
-const PITCHER_COLORS = [
-  "#2563eb", "#dc2626", "#059669", "#7c3aed",
-  "#d97706", "#0891b2", "#be185d", "#4f46e5",
-];
 
 const CONFIDENCE_STYLES: Record<MatchConfidence, { label: string; bg: string; text: string }> = {
   confirmed: { label: "Confirmed", bg: "bg-green-100", text: "text-green-800" },
@@ -26,6 +24,7 @@ export default function GameCard({ game, pitcherIndex, homeTeamName, warning }: 
   const dayName = gameDate.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
   const monthDay = gameDate.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
+  const { time, zone } = formatGameTime(game.gameDate);
   const ticketUrl = `https://www.mlb.com/gameday/${game.gamePk}`;
 
   return (
@@ -40,6 +39,10 @@ export default function GameCard({ game, pitcherIndex, homeTeamName, warning }: 
       <div className="text-center min-w-[60px]">
         <div className="text-xs font-medium text-gray-500 uppercase">{dayName}</div>
         <div className="text-lg font-bold text-gray-900">{monthDay}</div>
+        <div className="text-xs text-gray-500">{time} {zone}</div>
+        {game.doubleHeader && game.doubleHeader !== "N" && (
+          <div className="text-xs text-gray-500">Game {game.gameNumber}</div>
+        )}
       </div>
 
       {/* Divider */}
@@ -65,7 +68,7 @@ export default function GameCard({ game, pitcherIndex, homeTeamName, warning }: 
             <span className="text-xs font-medium text-gray-400 w-8 flex-shrink-0">vs</span>
             <span
               className="inline-block w-2 h-2 rounded-full flex-shrink-0"
-              style={{ backgroundColor: PITCHER_COLORS[pitcherIndex % PITCHER_COLORS.length] }}
+              style={{ backgroundColor: pitcherColor(pitcherIndex) }}
             />
             <span className="text-sm font-medium text-gray-800 truncate">
               {game.pitcher.fullName} ({game.pitcher.pitchHand}HP)
@@ -85,7 +88,7 @@ export default function GameCard({ game, pitcherIndex, homeTeamName, warning }: 
           </span>
         )}
         <span className="text-xs text-gray-400 group-hover:text-blue-500 transition-colors mt-0.5">
-          Tickets &rarr;
+          Gameday &rarr;
         </span>
       </div>
     </a>

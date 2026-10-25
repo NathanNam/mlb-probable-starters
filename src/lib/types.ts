@@ -1,55 +1,49 @@
-// MLB API response types
+// Shapes of the MLB Stats API responses we use (trimmed to the fields we read).
 
-export interface Team {
-  id: number;
-  name: string;
-  teamName: string;
-  abbreviation: string;
-  league: { id: number; name: string };
-  division: { id: number; name: string };
-}
-
-export interface Player {
-  id: number;
-  fullName: string;
-  primaryPosition: { abbreviation: string };
-  pitchHand?: { code: string; description: string };
-  active: boolean;
-  currentTeam?: Team;
+export interface ApiTeamSide {
+  team: { id: number; name: string };
+  probablePitcher?: { id: number; fullName: string };
+  leagueRecord?: { wins: number; losses: number };
+  score?: number;
+  isWinner?: boolean;
 }
 
 export interface ScheduleGame {
   gamePk: number;
-  gameDate: string; // ISO date
-  officialDate: string; // YYYY-MM-DD
-  status: { detailedState: string };
-  teams: {
-    away: {
-      team: { id: number; name: string };
-      probablePitcher?: { id: number; fullName: string };
-    };
-    home: {
-      team: { id: number; name: string };
-      probablePitcher?: { id: number; fullName: string };
-    };
+  gameType?: string; // R regular, F wild card, D division, L LCS, W World Series
+  gameDate: string; // ISO instant
+  officialDate: string; // YYYY-MM-DD (MLB's schedule day)
+  status: {
+    detailedState: string;
+    abstractGameState?: string; // Preview | Live | Final
+    codedGameState?: string;
+    startTimeTBD?: boolean;
+    reason?: string;
   };
-  venue: { name: string };
+  teams: { away: ApiTeamSide; home: ApiTeamSide };
+  venue: { id?: number; name: string };
+  doubleHeader?: string; // N | Y (traditional) | S (split)
+  gameNumber?: number;
+  description?: string;
+  seriesDescription?: string;
+  seriesGameNumber?: number;
+  gamesInSeries?: number;
+  ifNecessary?: string;
+  seriesStatus?: { result?: string; shortDescription?: string; description?: string };
 }
 
 export interface GameLogSplit {
   date: string; // YYYY-MM-DD
+  gameType?: string;
   stat: {
-    gamesStarted: number;
-    gamesPlayed: number;
-    inningsPitched: string;
-    wins: number;
-    losses: number;
-    earnedRunAverage: string;
-    strikeOuts: number;
+    gamesStarted?: number;
+    gamesPlayed?: number;
+    inningsPitched?: string;
+    strikeOuts?: number;
   };
-  team: { id: number; name: string };
-  opponent: { id: number; name: string };
-  isHome: boolean;
+  team?: { id: number; name: string };
+  opponent?: { id: number; name: string };
+  isHome?: boolean;
 }
 
 // App-level types
@@ -72,17 +66,21 @@ export interface PitcherWarning {
 export interface MatchedGame {
   gamePk: number;
   date: string; // YYYY-MM-DD
-  gameDate: string; // ISO date
+  gameDate: string; // ISO instant
   opponent: string;
+  opponentId: number;
   venue: string;
   pitcher: SelectedPitcher;
   confidence: MatchConfidence;
+  gameNumber?: number;
+  doubleHeader?: string;
   homePitcher?: { fullName: string }; // home team's probable starter
 }
 
 export interface RotationStart {
   date: string; // YYYY-MM-DD
   opponent: string;
+  opponentId?: number;
   isHome: boolean;
 }
 
@@ -91,9 +89,10 @@ export interface RotationInfo {
   pitcherName: string;
   pitchHand: string;
   teamName: string;
+  teamId: number;
   starts: RotationStart[];
   avgGap: number;
-  nextProjectedStart: string; // YYYY-MM-DD
+  nextProjectedStart: string; // YYYY-MM-DD, "" when nothing is left on the schedule
   nextProjectedOpponent?: string; // full team name
   nextProjectedIsHome?: boolean;
   nextProjectedConfidence?: MatchConfidence;

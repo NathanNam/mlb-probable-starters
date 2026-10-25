@@ -1,232 +1,36 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useSyncExternalStore, useCallback } from "react";
 import TeamPicker from "@/components/TeamPicker";
 import PitcherSearch from "@/components/PitcherSearch";
 import ScheduleResults from "@/components/ScheduleResults";
-import type { SelectedPitcher, MatchedGame, ScheduleGame, PitcherWarning, RotationInfo } from "@/lib/types";
-import { projectPitcherStarts, buildRotationInfo } from "@/lib/projection";
+import type { SelectedPitcher, MatchedGame, ScheduleGame, PitcherWarning, RotationInfo, GameLogSplit } from "@/lib/types";
+import { projectPitcherStarts, buildRotationInfo, inactivityWarning, startsFromGameLog } from "@/lib/projection";
+import { todayET, upcomingSeason } from "@/lib/dates";
+import { getJson } from "@/lib/http";
+import { teamById, type Team } from "@/lib/teams";
 
-interface Team {
-  id: number;
-  name: string;
-  abbreviation: string;
-  division: { id: number; name: string };
-  league: { id: number; name: string };
-}
-
-const CURRENT_SEASON = 2026;
 const STORAGE_KEY = "mlb-pitcher-tracker";
 
 function loadSaved(): { team: Team | null; pitchers: SelectedPitcher[] } {
-  if (typeof window === "undefined") return { team: null, pitchers: [] };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { team: null, pitchers: [] };
     const data = JSON.parse(raw);
     return {
-      team: data.team || null,
-      pitchers: data.pitchers || [],
+      team: teamById(data.team?.id) ?? null,
+      pitchers: Array.isArray(data.pitchers) ? data.pitchers : [],
     };
   } catch {
     return { team: null, pitchers: [] };
   }
 }
 
+const noopSubscribe = () => () => {};
+
 export default function Home() {
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const [selectedPitchers, setSelectedPitchers] = useState<SelectedPitcher[]>([]);
-  const [results, setResults] = useState<MatchedGame[] | null>(null);
-  const [rotationInfos, setRotationInfos] = useState<RotationInfo[]>([]);
-  const [pitcherWarnings, setPitcherWarnings] = useState<Map<number, PitcherWarning>>(new Map());
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
-
-  // Load saved selections on mount
-  useEffect(() => {
-    const saved = loadSaved();
-    if (saved.team) setSelectedTeam(saved.team);
-    if (saved.pitchers.length > 0) setSelectedPitchers(saved.pitchers);
-    setHydrated(true);
-  }, []);
-
-  // Persist selections to localStorage
-  const persist = useCallback((team: Team | null, pitchers: SelectedPitcher[]) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ team, pitchers }));
-    } catch { /* storage full or unavailable */ }
-  }, []);
-
-  const handleAddPitcher = (pitcher: SelectedPitcher) => {
-    setSelectedPitchers((prev) => {
-      const next = [...prev, pitcher];
-      persist(selectedTeam, next);
-      return next;
-    });
-    setResults(null);
-  };
-
-  const handleRemovePitcher = (id: number) => {
-    setSelectedPitchers((prev) => {
-      const next = prev.filter((p) => p.id !== id);
-      persist(selectedTeam, next);
-      return next;
-    });
-    setResults(null);
-    setPitcherWarnings((prev) => {
-      const next = new Map(prev);
-      next.delete(id);
-      return next;
-    });
-  };
-
-  const handleFindGames = async () => {
-    if (!selectedTeam || selectedPitchers.length === 0) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Fetch home team schedule
-      const scheduleRes = await fetch(
-        `/api/schedule?teamId=${selectedTeam.id}&season=${CURRENT_SEASON}`
-      );
-      const scheduleData = await scheduleRes.json();
-      const allGames: ScheduleGame[] = scheduleData.games || [];
-
-      // Filter to home games only
-      const homeGames = allGames.filter(
-        (g) => g.teams.home.team.id === selectedTeam.id
-      );
-
-      const allMatches: MatchedGame[] = [];
-      const allRotations: RotationInfo[] = [];
-      const warnings = new Map<number, PitcherWarning>();
-
-      await Promise.all(
-        selectedPitchers.map(async (pitcher) => {
-          // Fetch current player info to check roster status
-          const playerRes = await fetch(`/api/player/${pitcher.id}`);
-          const playerData = await playerRes.json();
-          const currentPlayer = playerData.player;
-
-          // Check if traded or released
-          if (currentPlayer?.currentTeam) {
-            if (currentPlayer.currentTeam.id !== pitcher.teamId) {
-              warnings.set(pitcher.id, {
-                type: "traded",
-                message: `Now on ${currentPlayer.currentTeam.name} (was ${pitcher.teamName})`,
-              });
-              // Update pitcher's team for correct series matching
-              pitcher = {
-                ...pitcher,
-                teamId: currentPlayer.currentTeam.id,
-                teamName: currentPlayer.currentTeam.name,
-              };
-            }
-          } else if (currentPlayer && !currentPlayer.currentTeam) {
-            warnings.set(pitcher.id, {
-              type: "inactive",
-              message: "No longer on an active roster",
-            });
-          }
-
-          // Fetch current season game log
-          const logRes = await fetch(
-            `/api/gamelog?playerId=${pitcher.id}&season=${CURRENT_SEASON}`
-          );
-          const logData = await logRes.json();
-          let splits = logData.splits || [];
-
-          const currentSeasonStarts = splits.filter(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (s: any) => s.stat?.gamesStarted === 1
-          );
-
-          // Check for inactivity mid-season
-          if (currentSeasonStarts.length > 0) {
-            const lastStart = currentSeasonStarts
-              .map((s: { date: string }) => s.date)
-              .sort()
-              .pop();
-            const today = new Date().toISOString().split("T")[0];
-            const daysSinceLastStart = Math.round(
-              (new Date(today).getTime() - new Date(lastStart).getTime()) /
-                (1000 * 60 * 60 * 24)
-            );
-            if (daysSinceLastStart > 15 && !warnings.has(pitcher.id)) {
-              warnings.set(pitcher.id, {
-                type: "inactive",
-                message: `Last start was ${lastStart} (${daysSinceLastStart} days ago) — may be on IL`,
-              });
-            }
-          } else {
-            // No starts this season — only flag if season has been underway for 3+ weeks
-            const completedGames = allGames
-              .filter((g) => g.status.detailedState === "Final")
-              .sort((a, b) => a.officialDate.localeCompare(b.officialDate));
-            if (completedGames.length > 0) {
-              const firstGameDate = new Date(completedGames[0].officialDate);
-              const daysSinceSeasonStart = Math.round(
-                (new Date().getTime() - firstGameDate.getTime()) / (1000 * 60 * 60 * 24)
-              );
-              if (daysSinceSeasonStart >= 21 && !warnings.has(pitcher.id)) {
-                warnings.set(pitcher.id, {
-                  type: "no_starts",
-                  message: `No starts in ${CURRENT_SEASON} yet — may be on IL or in minors`,
-                });
-              }
-            }
-          }
-
-          // Fetch previous season if needed
-          if (currentSeasonStarts.length < 3) {
-            const prevRes = await fetch(
-              `/api/gamelog?playerId=${pitcher.id}&season=${CURRENT_SEASON - 1}`
-            );
-            const prevData = await prevRes.json();
-            const prevSplits = prevData.splits || [];
-            splits = [...prevSplits, ...splits];
-          }
-
-          // Fetch the pitcher's team schedule so we can show the projected next opponent
-          let pitcherTeamSchedule: ScheduleGame[] | undefined;
-          try {
-            const teamSchedRes = await fetch(
-              `/api/schedule?teamId=${pitcher.teamId}&season=${CURRENT_SEASON}`
-            );
-            const teamSchedData = await teamSchedRes.json();
-            pitcherTeamSchedule = teamSchedData.games || [];
-          } catch {
-            // skip — projected box will fall back to date-only
-          }
-
-          // Build rotation pattern info from current season data
-          const rotInfo = buildRotationInfo(pitcher, splits, CURRENT_SEASON, pitcherTeamSchedule);
-          allRotations.push(rotInfo);
-
-          const matches = projectPitcherStarts(
-            homeGames,
-            pitcher,
-            splits,
-            CURRENT_SEASON
-          );
-          allMatches.push(...matches);
-        })
-      );
-
-      setPitcherWarnings(warnings);
-      setRotationInfos(allRotations);
-      setResults(allMatches);
-    } catch (err) {
-      console.error("Error finding games:", err);
-      setError("Failed to fetch schedule data. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Render the tracker only in the browser, where saved selections are readable.
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
   if (!hydrated) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
@@ -234,6 +38,117 @@ export default function Home() {
       </div>
     );
   }
+  return <Tracker initial={loadSaved()} />;
+}
+
+function Tracker({ initial }: { initial: { team: Team | null; pitchers: SelectedPitcher[] } }) {
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(initial.team);
+  const [selectedPitchers, setSelectedPitchers] = useState<SelectedPitcher[]>(initial.pitchers);
+  const [results, setResults] = useState<MatchedGame[] | null>(null);
+  const [rotationInfos, setRotationInfos] = useState<RotationInfo[]>([]);
+  const [pitcherWarnings, setPitcherWarnings] = useState<Map<number, PitcherWarning>>(new Map());
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const persist = useCallback((team: Team | null, pitchers: SelectedPitcher[]) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ team, pitchers }));
+    } catch { /* storage full or unavailable */ }
+  }, []);
+
+  const handleAddPitcher = (pitcher: SelectedPitcher) => {
+    const next = [...selectedPitchers, pitcher];
+    setSelectedPitchers(next);
+    persist(selectedTeam, next);
+    setResults(null);
+  };
+
+  const handleRemovePitcher = (id: number) => {
+    const next = selectedPitchers.filter((p) => p.id !== id);
+    setSelectedPitchers(next);
+    persist(selectedTeam, next);
+    setResults(null);
+    setPitcherWarnings((prev) => {
+      const m = new Map(prev);
+      m.delete(id);
+      return m;
+    });
+  };
+
+  const handleFindGames = async () => {
+    if (!selectedTeam || selectedPitchers.length === 0) return;
+    setIsLoading(true);
+    setError(null);
+    const today = todayET();
+    const season = upcomingSeason(today);
+
+    try {
+      const scheduleData = await getJson<{ games: ScheduleGame[] }>(
+        `/api/schedule?teamId=${selectedTeam.id}&season=${season}`
+      );
+      const homeGames = scheduleData.games.filter((g) => g.teams.home.team.id === selectedTeam.id);
+      const warnings = new Map<number, PitcherWarning>();
+
+      const perPitcher = await Promise.all(
+        selectedPitchers.map(async (saved) => {
+          let pitcher = saved;
+          const { player } = await getJson<{ player?: { currentTeam?: { id: number; name: string } } }>(
+            `/api/player/${pitcher.id}`
+          );
+          if (player?.currentTeam && player.currentTeam.id !== pitcher.teamId) {
+            warnings.set(pitcher.id, {
+              type: "traded",
+              message: `Now on the ${player.currentTeam.name} (was ${pitcher.teamName})`,
+            });
+            pitcher = { ...pitcher, teamId: player.currentTeam.id, teamName: player.currentTeam.name };
+          } else if (player && !player.currentTeam) {
+            warnings.set(pitcher.id, { type: "inactive", message: "No longer on an active roster" });
+          }
+
+          let { splits } = await getJson<{ splits: GameLogSplit[] }>(
+            `/api/gamelog?playerId=${pitcher.id}&season=${season}`
+          );
+          if (startsFromGameLog(splits).length < 3) {
+            const prev = await getJson<{ splits: GameLogSplit[] }>(
+              `/api/gamelog?playerId=${pitcher.id}&season=${season - 1}`
+            );
+            splits = [...prev.splits, ...splits];
+          }
+
+          const teamSchedule =
+            pitcher.teamId === selectedTeam.id
+              ? scheduleData.games
+              : (await getJson<{ games: ScheduleGame[] }>(`/api/schedule?teamId=${pitcher.teamId}&season=${season}`)).games;
+
+          const warning = inactivityWarning(startsFromGameLog(splits), teamSchedule, today);
+          if (warning && !warnings.has(pitcher.id)) warnings.set(pitcher.id, warning);
+
+          return {
+            pitcher,
+            rotation: buildRotationInfo(pitcher, splits, today, teamSchedule),
+            matches: projectPitcherStarts(homeGames, pitcher, splits, today),
+          };
+        })
+      );
+
+      // Keep a traded pitcher's new team for next time.
+      const updated = perPitcher.map((r) => r.pitcher);
+      if (updated.some((p, i) => p.teamId !== selectedPitchers[i].teamId)) {
+        setSelectedPitchers(updated);
+        persist(selectedTeam, updated);
+      }
+
+      setPitcherWarnings(warnings);
+      setRotationInfos(perPitcher.map((r) => r.rotation)); // same order as the chips
+      setResults(perPitcher.flatMap((r) => r.matches));
+    } catch (err) {
+      console.error("Error finding games:", err);
+      setResults(null);
+      setError("Couldn't load the schedule from MLB just now. Please try again in a moment.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -338,7 +253,7 @@ export default function Home() {
                 games={results}
                 pitchers={selectedPitchers}
                 teamName={selectedTeam?.name || ""}
-                teamAbbreviation={selectedTeam?.abbreviation || ""}
+                teamAbbreviation={selectedTeam?.abbr || ""}
                 pitcherWarnings={pitcherWarnings}
                 rotationInfos={rotationInfos}
               />

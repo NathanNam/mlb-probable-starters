@@ -1,13 +1,10 @@
 "use client";
 
+import { pitcherColor } from "@/lib/teams";
 import type { MatchedGame, SelectedPitcher, PitcherWarning, RotationInfo } from "@/lib/types";
 import GameCard from "./GameCard";
 import RotationPattern from "./RotationPattern";
 
-const PITCHER_COLORS = [
-  "#2563eb", "#dc2626", "#059669", "#7c3aed",
-  "#d97706", "#0891b2", "#be185d", "#4f46e5",
-];
 
 const WARNING_ICONS: Record<PitcherWarning["type"], string> = {
   traded: "\u{1F504}",   // 🔄
@@ -34,27 +31,12 @@ export default function ScheduleResults({ games, pitchers, teamName, teamAbbrevi
     return (
       <div className="text-center py-12">
         <div className="text-5xl mb-4">&#9918;</div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">No matching home games found</h3>
-        <div className="text-gray-500 max-w-md mx-auto">
-          {uniqueTeams.length === 1 ? (
-            <p>
-              The <span className="font-medium text-gray-700">{uniqueTeams[0]}</span> don&apos;t
-              visit the {teamName} this regular season. They may only play as an away series at the
-              opponent&apos;s stadium.
-            </p>
-          ) : (
-            <p>
-              The following teams don&apos;t visit the {teamName} this regular season:{" "}
-              {uniqueTeams.map((name, i) => (
-                <span key={name}>
-                  {i > 0 && (i === uniqueTeams.length - 1 ? " and " : ", ")}
-                  <span className="font-medium text-gray-700">{name}</span>
-                </span>
-              ))}
-              . They may only play as away series at the opponents&apos; stadiums.
-            </p>
-          )}
-        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">No upcoming home games found</h3>
+        <p className="text-gray-500 max-w-md mx-auto">
+          None of the {teamName}&apos; remaining home games on MLB&apos;s schedule are against{" "}
+          {uniqueTeams.join(", ")}. Games already played, postponed or suspended are not counted; once the
+          season is over, next season&apos;s games appear when MLB publishes the schedule.
+        </p>
       </div>
     );
   }
@@ -109,7 +91,7 @@ export default function ScheduleResults({ games, pitchers, teamName, teamAbbrevi
                 <div className="flex items-center gap-2">
                   <span
                     className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: PITCHER_COLORS[index % PITCHER_COLORS.length] }}
+                    style={{ backgroundColor: pitcherColor(index) }}
                   />
                   <span className="text-sm font-semibold text-gray-900">
                     {pitcher.fullName}
@@ -175,11 +157,11 @@ export default function ScheduleResults({ games, pitchers, teamName, teamAbbrevi
           </span>
           <span>
             <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5" />
-            Projected &mdash; matches rotation pattern
+            Projected &mdash; rotation lands within a day of this game
           </span>
           <span>
             <span className="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1.5" />
-            Possible &mdash; within 1 day of projection
+            Possible &mdash; the series fits, but the rotation doesn&apos;t line up
           </span>
         </div>
       </div>
