@@ -1,138 +1,144 @@
-import type { ScheduleGame, SelectedPitcher, MatchedGame, MatchConfidence, RotationInfo, RotationStart } from "./types";
+import type {
+  GameLogSplit,
+  MatchConfidence,
+  MatchedGame,
+  PitcherWarning,
+  RotationInfo,
+  RotationStart,
+  ScheduleGame,
+  SelectedPitcher,
+} from "./types";
+import { addDays, daysBetween, seasonFromDate } from "./dates";
 
-interface StartEntry {
-  date: string; // YYYY-MM-DD
-}
+/** A projection older than this many days since the last start is not trusted. */
+const STALE_AFTER_DAYS = 30;
+/** A rotation date within this many days of a game counts as "projected". */
+export const PROJECTED_WITHIN_DAYS = 1;
+/** The rotation card looks this far either side of the projected date. */
+export const ROTATION_WINDOW_DAYS = 2;
 
 interface Series {
   games: ScheduleGame[];
-  startDate: string;
-  endDate: string;
 }
 
-function daysBetween(a: string, b: string): number {
-  const da = new Date(a + "T12:00:00Z");
-  const db = new Date(b + "T12:00:00Z");
-  return Math.round((db.getTime() - da.getTime()) / (1000 * 60 * 60 * 24));
+const DONE_STATE = /final|game over|completed|postponed|cancel|suspended/i;
+
+/** True for games that can still be played as scheduled (not over, postponed or suspended). */
+export function isPlayable(game: ScheduleGame): boolean {
+  if (game.status.abstractGameState === "Final") return false;
+  return !DONE_STATE.test(game.status.detailedState);
 }
 
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + "T12:00:00Z");
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().split("T")[0];
+/** Games from `today` (MLB schedule day) on that can still be played. */
+export function upcomingGames(games: ScheduleGame[], today: string): ScheduleGame[] {
+  return games
+    .filter((g) => g.officialDate >= today && isPlayable(g))
+    .sort((a, b) => a.officialDate.localeCompare(b.officialDate) || (a.gameNumber ?? 1) - (b.gameNumber ?? 1));
 }
 
 /**
- * Calculate average rotation gap from a list of start dates.
- * Discards outlier gaps (<3 or >10 days) to ignore IL stints, all-star breaks, etc.
- * Returns 5 as default if insufficient data.
+ * Average days between starts. Gaps under 3 or over 10 days (IL stints, the
+ * All-Star break, the off-season) are ignored. Defaults to 5.
  */
-export function calculateRotationGap(starts: StartEntry[]): number {
+export function calculateRotationGap(starts: Array<{ date: string }>): number {
   if (starts.length < 2) return 5;
-
   const sorted = [...starts].sort((a, b) => a.date.localeCompare(b.date));
   const gaps: number[] = [];
-
   for (let i = 1; i < sorted.length; i++) {
     const gap = daysBetween(sorted[i - 1].date, sorted[i].date);
-    if (gap >= 3 && gap <= 10) {
-      gaps.push(gap);
-    }
+    if (gap >= 3 && gap <= 10) gaps.push(gap);
   }
-
   if (gaps.length === 0) return 5;
   return Math.round(gaps.reduce((sum, g) => sum + g, 0) / gaps.length);
 }
 
-/**
- * Group home games by opponent into series.
- * A series is a set of consecutive games (within 3 days of each other) against the same team.
- */
-function groupIntoSeries(games: ScheduleGame[], opponentId: number): Series[] {
-  const opponentGames = games
-    .filter((g) => g.teams.away.team.id === opponentId)
-    .sort((a, b) => a.officialDate.localeCompare(b.officialDate));
-
-  if (opponentGames.length === 0) return [];
-
-  const seriesList: Series[] = [];
-  let currentSeries: ScheduleGame[] = [opponentGames[0]];
-
-  for (let i = 1; i < opponentGames.length; i++) {
-    const prevDate = opponentGames[i - 1].officialDate;
-    const currDate = opponentGames[i].officialDate;
-    const gap = daysBetween(prevDate, currDate);
-
-    if (gap <= 3) {
-      // Same series (accounts for off-days within a series)
-      currentSeries.push(opponentGames[i]);
-    } else {
-      // New series
-      seriesList.push({
-        games: currentSeries,
-        startDate: currentSeries[0].officialDate,
-        endDate: currentSeries[currentSeries.length - 1].officialDate,
-      });
-      currentSeries = [opponentGames[i]];
-    }
-  }
-
-  seriesList.push({
-    games: currentSeries,
-    startDate: currentSeries[0].officialDate,
-    endDate: currentSeries[currentSeries.length - 1].officialDate,
-  });
-
-  return seriesList;
+/** Regular-season and postseason starts from a game log, oldest first. */
+export function startsFromGameLog(splits: GameLogSplit[]): RotationStart[] {
+  const seen = new Set<string>();
+  return splits
+    .filter((s) => s.stat?.gamesStarted === 1)
+    .map((s) => ({
+      date: s.date,
+      opponent: s.opponent?.name || "Unknown",
+      opponentId: s.opponent?.id,
+      isHome: s.isHome ?? false,
+    }))
+    .filter((s) => {
+      const key = `${s.date}|${s.opponentId}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**
- * For a given series, find which game the pitcher most likely starts
- * based on rotation projection. Returns the game index.
+ * Group games against `opponentId` into series: consecutive games no more than
+ * three days apart (a doubleheader is two games on one day of the same series).
  */
-function findBestGameInSeries(
-  series: Series,
+export function groupIntoSeries(games: ScheduleGame[], opponentId: number): Series[] {
+  const opponentGames = games
+    .filter((g) => g.teams.away.team.id === opponentId)
+    .sort((a, b) => a.officialDate.localeCompare(b.officialDate) || (a.gameNumber ?? 1) - (b.gameNumber ?? 1));
+  const seriesList: Series[] = [];
+  for (const game of opponentGames) {
+    const current = seriesList[seriesList.length - 1];
+    const prev = current?.games[current.games.length - 1];
+    if (prev && daysBetween(prev.officialDate, game.officialDate) <= 3) current.games.push(game);
+    else seriesList.push({ games: [game] });
+  }
+  return seriesList;
+}
+
+/** Rotation dates from the last start onward, keeping those from `today` through `until`. */
+export function projectedRotationDates(lastStart: string, gap: number, today: string, until: string): string[] {
+  if (daysBetween(lastStart, today) > STALE_AFTER_DAYS) return [];
+  // A rotation never carries over the winter.
+  const seasonEnd = `${seasonFromDate(lastStart)}-11-30`;
+  if (until > seasonEnd) until = seasonEnd;
+  const dates: string[] = [];
+  let current = lastStart;
+  for (let i = 0; i < 200; i++) {
+    current = addDays(current, gap);
+    if (current > until) break;
+    if (current >= today) dates.push(current);
+  }
+  return dates;
+}
+
+/** Pick the game in a series closest to a projected rotation date. */
+export function findBestGameInSeries(
+  games: ScheduleGame[],
   projectedDates: string[]
 ): { gameIndex: number; confidence: MatchConfidence } {
-  if (projectedDates.length === 0 || series.games.length === 1) {
-    return { gameIndex: 0, confidence: "possible" };
-  }
-
-  // Find the projected date closest to any game in this series
+  if (projectedDates.length === 0) return { gameIndex: 0, confidence: "possible" };
   let bestIndex = 0;
   let bestDiff = Infinity;
-
-  for (let gi = 0; gi < series.games.length; gi++) {
-    const gameDate = series.games[gi].officialDate;
+  games.forEach((game, gi) => {
     for (const projDate of projectedDates) {
-      const diff = Math.abs(daysBetween(gameDate, projDate));
+      const diff = Math.abs(daysBetween(game.officialDate, projDate));
       if (diff < bestDiff) {
         bestDiff = diff;
         bestIndex = gi;
       }
     }
-  }
-
-  // Confidence based on how close the projection aligns
-  const confidence: MatchConfidence =
-    bestDiff === 0 ? "projected" : bestDiff <= 1 ? "projected" : "possible";
-
-  return { gameIndex: bestIndex, confidence };
+  });
+  return { gameIndex: bestIndex, confidence: bestDiff <= PROJECTED_WITHIN_DAYS ? "projected" : "possible" };
 }
 
-function makeMatchedGame(
-  game: ScheduleGame,
-  pitcher: SelectedPitcher,
-  confidence: MatchConfidence
-): MatchedGame {
+function makeMatchedGame(game: ScheduleGame, pitcher: SelectedPitcher, confidence: MatchConfidence): MatchedGame {
   return {
     gamePk: game.gamePk,
     date: game.officialDate,
     gameDate: game.gameDate,
+    startTimeTBD: game.status.startTimeTBD,
     opponent: game.teams.away.team.name,
+    opponentId: game.teams.away.team.id,
     venue: game.venue.name,
     pitcher,
     confidence,
+    gameNumber: game.gameNumber,
+    doubleHeader: game.doubleHeader,
     homePitcher: game.teams.home.probablePitcher
       ? { fullName: game.teams.home.probablePitcher.fullName }
       : undefined,
@@ -140,93 +146,57 @@ function makeMatchedGame(
 }
 
 /**
- * Build rotation info for a pitcher from their game log.
- * Shows recent starts, average gap, and next projected start date.
- * If pitcherTeamSchedule is provided, the projected next start is aligned
- * to a real scheduled game and the opponent is filled in.
+ * Rotation summary for one pitcher: recent starts, average gap and the next
+ * start — confirmed by MLB, or projected onto the team's remaining schedule.
  */
 export function buildRotationInfo(
   pitcher: SelectedPitcher,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  gameLogSplits: any[],
-  season: number,
-  pitcherTeamSchedule?: ScheduleGame[]
+  gameLogSplits: GameLogSplit[],
+  today: string,
+  pitcherTeamSchedule: ScheduleGame[] = []
 ): RotationInfo {
-  const starts: RotationStart[] = gameLogSplits
-    .filter((s) => s.stat?.gamesStarted === 1 && s.date >= `${season}-01-01`)
-    .map((s) => ({
-      date: s.date,
-      opponent: s.opponent?.name || "Unknown",
-      isHome: s.isHome ?? false,
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const starts = startsFromGameLog(gameLogSplits);
+  const avgGap = calculateRotationGap(starts);
+  const lastStart = starts.length > 0 ? starts[starts.length - 1].date : undefined;
 
-  const startEntries = starts.map((s) => ({ date: s.date }));
-  const avgGap = calculateRotationGap(startEntries);
+  const ownProbable = (g: ScheduleGame) =>
+    g.teams.home.team.id === pitcher.teamId ? g.teams.home.probablePitcher : g.teams.away.probablePitcher;
+  const futureGames = upcomingGames(pitcherTeamSchedule, today).filter(
+    (g) => (g.teams.home.team.id === pitcher.teamId || g.teams.away.team.id === pitcher.teamId) &&
+      (!lastStart || g.officialDate > lastStart)
+  );
 
   let nextProjectedStart = "";
-  let nextProjectedOpponent: string | undefined;
-  let nextProjectedIsHome: boolean | undefined;
   let nextProjectedConfidence: MatchConfidence | undefined;
+  let bestGame = futureGames.find((g) => ownProbable(g)?.id === pitcher.id);
 
-  if (starts.length >= 1) {
-    const lastStart = starts[starts.length - 1].date;
-    nextProjectedStart = addDays(lastStart, avgGap);
-
-    // Try to align the projected date to an actual scheduled game
-    if (pitcherTeamSchedule && pitcherTeamSchedule.length > 0) {
-      const futureGames = pitcherTeamSchedule.filter(
-        (g) => g.officialDate > lastStart
-      );
-
-      // Pass 1: look for any future game where MLB has announced THIS pitcher
-      let confirmedGame: ScheduleGame | undefined;
-      for (const game of futureGames) {
-        const isHomeGame = game.teams.home.team.id === pitcher.teamId;
-        const probable = isHomeGame
-          ? game.teams.home.probablePitcher
-          : game.teams.away.probablePitcher;
-        if (probable?.id === pitcher.id) {
-          confirmedGame = game;
-          break; // earliest one
-        }
-      }
-
-      let bestGame: ScheduleGame | undefined;
-      if (confirmedGame) {
-        bestGame = confirmedGame;
-        nextProjectedConfidence = "confirmed";
-      } else {
-        // Pass 2: rotation projection — closest game within ±2 days,
-        // skipping games where another pitcher is already announced
-        let bestDiff = Infinity;
-        for (const game of futureGames) {
-          const isHomeGame = game.teams.home.team.id === pitcher.teamId;
-          const probable = isHomeGame
-            ? game.teams.home.probablePitcher
-            : game.teams.away.probablePitcher;
-          if (probable && probable.id !== pitcher.id) continue;
-
-          const diff = Math.abs(daysBetween(game.officialDate, nextProjectedStart));
-          if (diff < bestDiff && diff <= 2) {
-            bestDiff = diff;
-            bestGame = game;
-          }
-        }
-        if (bestGame) {
-          nextProjectedConfidence = bestDiff <= 1 ? "projected" : "possible";
-        }
-      }
-
-      if (bestGame) {
-        const isHome = bestGame.teams.home.team.id === pitcher.teamId;
-        nextProjectedStart = bestGame.officialDate;
-        nextProjectedOpponent = isHome
-          ? bestGame.teams.away.team.name
-          : bestGame.teams.home.team.name;
-        nextProjectedIsHome = isHome;
+  if (bestGame) {
+    nextProjectedConfidence = "confirmed";
+  } else if (lastStart && futureGames.length > 0 && daysBetween(lastStart, today) <= STALE_AFTER_DAYS) {
+    let projected = addDays(lastStart, avgGap);
+    while (projected < today) projected = addDays(projected, avgGap);
+    nextProjectedStart = projected;
+    nextProjectedConfidence = "possible";
+    let bestDiff = Infinity;
+    for (const game of futureGames) {
+      const probable = ownProbable(game);
+      if (probable && probable.id !== pitcher.id) continue;
+      const diff = Math.abs(daysBetween(game.officialDate, projected));
+      if (diff < bestDiff && diff <= ROTATION_WINDOW_DAYS) {
+        bestDiff = diff;
+        bestGame = game;
       }
     }
+    if (bestGame) nextProjectedConfidence = bestDiff <= PROJECTED_WITHIN_DAYS ? "projected" : "possible";
+  }
+
+  let nextProjectedOpponent: string | undefined;
+  let nextProjectedIsHome: boolean | undefined;
+  if (bestGame) {
+    const isHome = bestGame.teams.home.team.id === pitcher.teamId;
+    nextProjectedStart = bestGame.officialDate;
+    nextProjectedOpponent = isHome ? bestGame.teams.away.team.name : bestGame.teams.home.team.name;
+    nextProjectedIsHome = isHome;
   }
 
   return {
@@ -234,95 +204,83 @@ export function buildRotationInfo(
     pitcherName: pitcher.fullName,
     pitchHand: pitcher.pitchHand,
     teamName: pitcher.teamName,
+    teamId: pitcher.teamId,
     starts,
     avgGap,
     nextProjectedStart,
     nextProjectedOpponent,
     nextProjectedIsHome,
-    nextProjectedConfidence,
-    totalStarts: starts.length,
+    nextProjectedConfidence: nextProjectedStart ? nextProjectedConfidence : undefined,
+    totalStarts: starts.filter((s) => seasonFromDate(s.date) === seasonFromDate(lastStart ?? today)).length,
   };
 }
 
 /**
- * Full projection pipeline for a single pitcher against a home team's schedule.
- * Uses series-based matching: a starter pitches once per series.
+ * Upcoming home games where `pitcher` might start. A starter pitches about once
+ * per series, so each remaining series against his team yields one game:
+ * confirmed when MLB lists him, otherwise the game nearest his rotation.
+ * Games already played, postponed or suspended are skipped.
  */
 export function projectPitcherStarts(
   homeGames: ScheduleGame[],
   pitcher: SelectedPitcher,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  gameLogSplits: any[],
-  season: number
+  gameLogSplits: GameLogSplit[],
+  today: string
 ): MatchedGame[] {
-  // Group home games into series against the pitcher's team
-  const seriesList = groupIntoSeries(homeGames, pitcher.teamId);
+  const remaining = upcomingGames(homeGames, today);
+  const seriesList = groupIntoSeries(remaining, pitcher.teamId);
   if (seriesList.length === 0) return [];
 
-  // Extract starts from game log
-  const starts: StartEntry[] = gameLogSplits
-    .filter((s) => s.stat?.gamesStarted === 1)
-    .map((s) => ({ date: s.date }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  // Build projected dates for alignment within series
-  let projectedDates: string[] = [];
-  if (starts.length >= 2) {
-    const avgGap = calculateRotationGap(starts);
-    const lastStart = starts[starts.length - 1].date;
-    const seasonEnd = `${season}-10-05`;
-
-    let current = lastStart;
-    while (true) {
-      current = addDays(current, avgGap);
-      if (current > seasonEnd) break;
-      projectedDates.push(current);
-    }
-  }
+  const starts = startsFromGameLog(gameLogSplits);
+  const lastGame = remaining[remaining.length - 1].officialDate;
+  const projectedDates =
+    starts.length >= 2
+      ? projectedRotationDates(starts[starts.length - 1].date, calculateRotationGap(starts), today, lastGame)
+      : [];
 
   const results: MatchedGame[] = [];
-
   for (const series of seriesList) {
-    // Check for confirmed starters in this series
-    let hasConfirmed = false;
-    let allGamesHaveOtherPitcher = true;
-
-    for (const game of series.games) {
-      const awayProbable = game.teams.away.probablePitcher;
-      if (awayProbable?.id === pitcher.id) {
-        // This pitcher is confirmed for this game
-        results.push(makeMatchedGame(game, pitcher, "confirmed"));
-        hasConfirmed = true;
-        allGamesHaveOtherPitcher = false;
-      } else if (!awayProbable) {
-        allGamesHaveOtherPitcher = false;
-      }
+    const confirmed = series.games.filter((g) => g.teams.away.probablePitcher?.id === pitcher.id);
+    if (confirmed.length > 0) {
+      for (const g of confirmed) results.push(makeMatchedGame(g, pitcher, "confirmed"));
+      continue;
     }
-
-    // If we already have a confirmed start in this series, skip projection
-    if (hasConfirmed) continue;
-
-    // If all games have a different confirmed pitcher, skip this series
-    if (allGamesHaveOtherPitcher) continue;
-
-    // Find unconfirmed games in this series
-    const unconfirmedGames = series.games.filter(
-      (g) => !g.teams.away.probablePitcher
-    );
-
-    if (unconfirmedGames.length === 0) continue;
-
-    // Build a mini-series of just unconfirmed games for projection
-    const miniSeries: Series = {
-      games: unconfirmedGames,
-      startDate: unconfirmedGames[0].officialDate,
-      endDate: unconfirmedGames[unconfirmedGames.length - 1].officialDate,
-    };
-
-    // Pick the best game in the series based on rotation alignment
-    const { gameIndex, confidence } = findBestGameInSeries(miniSeries, projectedDates);
-    results.push(makeMatchedGame(unconfirmedGames[gameIndex], pitcher, confidence));
+    const open = series.games.filter((g) => !g.teams.away.probablePitcher);
+    if (open.length === 0) continue; // every game already has another starter listed
+    const { gameIndex, confidence } = findBestGameInSeries(open, projectedDates);
+    results.push(makeMatchedGame(open[gameIndex], pitcher, confidence));
   }
-
   return results;
+}
+
+/**
+ * Inactivity warning ("may be on the IL"), only while the regular season is
+ * under way for the pitcher's team — never in spring, October or winter.
+ */
+export function inactivityWarning(
+  starts: RotationStart[],
+  teamSchedule: ScheduleGame[],
+  today: string
+): PitcherWarning | null {
+  const regular = teamSchedule
+    .filter((g) => (g.gameType ?? "R") === "R")
+    .map((g) => g.officialDate)
+    .sort();
+  if (regular.length === 0) return null;
+  const first = regular[0];
+  const last = regular[regular.length - 1];
+  if (today < first || today > last) return null;
+
+  const season = seasonFromDate(today);
+  const thisSeason = starts.filter((s) => seasonFromDate(s.date) === season);
+  if (thisSeason.length > 0) {
+    const lastStart = thisSeason[thisSeason.length - 1].date;
+    const days = daysBetween(lastStart, today);
+    return days > 15
+      ? { type: "inactive", message: `Last start was ${lastStart} (${days} days ago) — may be on the IL` }
+      : null;
+  }
+  return daysBetween(first, today) >= 21
+    ? { type: "no_starts", message: `No starts in ${season} yet — may be on the IL or in the minors` }
+    : null;
 }

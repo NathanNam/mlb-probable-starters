@@ -1,0 +1,201 @@
+{
+ "dates": [
+  {
+   "date": "2026-08-15",
+   "games": [
+    {
+     "gamePk": 824239,
+     "gameType": "R",
+     "gameDate": "2026-08-15T17:10:00Z",
+     "officialDate": "2026-08-15",
+     "status": {
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "startTimeTBD": false
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 145,
+        "name": "Chicago White Sox"
+       },
+       "leagueRecord": {
+        "wins": 64,
+        "losses": 58
+       },
+       "score": 4,
+       "isWinner": true,
+       "probablePitcher": {
+        "id": 641743,
+        "fullName": "Anthony Kay"
+       }
+      },
+      "home": {
+       "team": {
+        "id": 116,
+        "name": "Detroit Tigers"
+       },
+       "leagueRecord": {
+        "wins": 60,
+        "losses": 63
+       },
+       "score": 3,
+       "isWinner": false,
+       "probablePitcher": {
+        "id": 675512,
+        "fullName": "Troy Melton"
+       }
+      }
+     },
+     "venue": {
+      "id": 2394,
+      "name": "Comerica Park"
+     },
+     "seriesStatus": {
+      "gameNumber": 2,
+      "wins": 2,
+      "losses": 0,
+      "description": "Regular Season",
+      "shortDescription": "Season",
+      "result": "CWS wins 2-0"
+     },
+     "gameNumber": 1,
+     "doubleHeader": "N",
+     "gamesInSeries": 3,
+     "seriesGameNumber": 2,
+     "seriesDescription": "Regular Season",
+     "ifNecessary": "N"
+    },
+    {
+     "gamePk": 822775,
+     "gameType": "R",
+     "gameDate": "2026-08-15T19:07:00Z",
+     "officialDate": "2026-08-15",
+     "status": {
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "startTimeTBD": false
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 147,
+        "name": "New York Yankees"
+       },
+       "leagueRecord": {
+        "wins": 68,
+        "losses": 55
+       },
+       "score": 1,
+       "isWinner": false,
+       "probablePitcher": {
+        "id": 693645,
+        "fullName": "Cam Schlittler"
+       }
+      },
+      "home": {
+       "team": {
+        "id": 141,
+        "name": "Toronto Blue Jays"
+       },
+       "leagueRecord": {
+        "wins": 61,
+        "losses": 64
+       },
+       "score": 4,
+       "isWinner": true,
+       "probablePitcher": {
+        "id": 680755,
+        "fullName": "Braydon Fisher"
+       }
+      }
+     },
+     "venue": {
+      "id": 14,
+      "name": "Rogers Centre"
+     },
+     "seriesStatus": {
+      "gameNumber": 2,
+      "wins": 2,
+      "losses": 0,
+      "description": "Regular Season",
+      "shortDescription": "Season",
+      "result": "TOR wins 2-0"
+     },
+     "gameNumber": 1,
+     "doubleHeader": "N",
+     "gamesInSeries": 3,
+     "seriesGameNumber": 2,
+     "seriesDescription": "Regular Season",
+     "ifNecessary": "N"
+    },
+    {
+     "gamePk": 823914,
+     "gameType": "R",
+     "gameDate": "2026-08-15T23:15:00Z",
+     "officialDate": "2026-08-15",
+     "status": {
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "startTimeTBD": false
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 158,
+        "name": "Milwaukee Brewers"
+       },
+       "leagueRecord": {
+        "wins": 76,
+        "losses": 48
+       },
+       "score": 4,
+       "isWinner": true,
+       "probablePitcher": {
+        "id": 694819,
+        "fullName": "Jacob Misiorowski"
+       }
+      },
+      "home": {
+       "team": {
+        "id": 119,
+        "name": "Los Angeles Dodgers"
+       },
+       "leagueRecord": {
+        "wins": 74,
+        "losses": 50
+       },
+       "score": 1,
+       "isWinner": false,
+       "probablePitcher": {
+        "id": 680736,
+        "fullName": "Justin Wrobleski"
+       }
+      }
+     },
+     "venue": {
+      "id": 22,
+      "name": "UNIQLO Field at Dodger Stadium"
+     },
+     "seriesStatus": {
+      "gameNumber": 3,
+      "wins": 2,
+      "losses": 1,
+      "description": "Regular Season",
+      "shortDescription": "Season",
+      "result": "MIL leads 2-1"
+     },
+     "gameNumber": 1,
+     "doubleHeader": "N",
+     "gamesInSeries": 4,
+     "seriesGameNumber": 3,
+     "seriesDescription": "Regular Season",
+     "ifNecessary": "N"
+    }
+   ]
+  }
+ ]
+}

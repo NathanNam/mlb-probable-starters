@@ -1,358 +1,127 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import TeamPicker from "@/components/TeamPicker";
-import PitcherSearch from "@/components/PitcherSearch";
-import ScheduleResults from "@/components/ScheduleResults";
-import type { SelectedPitcher, MatchedGame, ScheduleGame, PitcherWarning, RotationInfo } from "@/lib/types";
-import { projectPitcherStarts, buildRotationInfo } from "@/lib/projection";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
+import Masthead from "@/components/Masthead";
+import SlateView from "@/components/SlateView";
+import RotationView, { SetupPrompt } from "@/components/RotationView";
+import RotationSheet from "@/components/RotationSheet";
+import PitchersView from "@/components/PitchersView";
+import { useView, type Tab } from "@/lib/urlState";
+import { useSaved } from "@/lib/storage";
+import { useAsync } from "@/lib/useAsync";
+import { runRotationWatch } from "@/lib/rotation";
+import { todayET, todayLocal, viewerTimeZone } from "@/lib/dates";
+import { teamByAbbr, teamById } from "@/lib/teams";
+import type { SelectedPitcher } from "@/lib/types";
+import type { PitcherLine, SlateSide } from "@/lib/slate";
 
-interface Team {
-  id: number;
-  name: string;
-  abbreviation: string;
-  division: { id: number; name: string };
-  league: { id: number; name: string };
-}
+const noopSubscribe = () => () => {};
 
-const CURRENT_SEASON = 2026;
-const STORAGE_KEY = "mlb-pitcher-tracker";
-
-function loadSaved(): { team: Team | null; pitchers: SelectedPitcher[] } {
-  if (typeof window === "undefined") return { team: null, pitchers: [] };
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { team: null, pitchers: [] };
-    const data = JSON.parse(raw);
-    return {
-      team: data.team || null,
-      pitchers: data.pitchers || [],
-    };
-  } catch {
-    return { team: null, pitchers: [] };
-  }
-}
-
-export default function Home() {
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const [selectedPitchers, setSelectedPitchers] = useState<SelectedPitcher[]>([]);
-  const [results, setResults] = useState<MatchedGame[] | null>(null);
-  const [rotationInfos, setRotationInfos] = useState<RotationInfo[]>([]);
-  const [pitcherWarnings, setPitcherWarnings] = useState<Map<number, PitcherWarning>>(new Map());
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
-
-  // Load saved selections on mount
-  useEffect(() => {
-    const saved = loadSaved();
-    if (saved.team) setSelectedTeam(saved.team);
-    if (saved.pitchers.length > 0) setSelectedPitchers(saved.pitchers);
-    setHydrated(true);
-  }, []);
-
-  // Persist selections to localStorage
-  const persist = useCallback((team: Team | null, pitchers: SelectedPitcher[]) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ team, pitchers }));
-    } catch { /* storage full or unavailable */ }
-  }, []);
-
-  const handleAddPitcher = (pitcher: SelectedPitcher) => {
-    setSelectedPitchers((prev) => {
-      const next = [...prev, pitcher];
-      persist(selectedTeam, next);
-      return next;
-    });
-    setResults(null);
-  };
-
-  const handleRemovePitcher = (id: number) => {
-    setSelectedPitchers((prev) => {
-      const next = prev.filter((p) => p.id !== id);
-      persist(selectedTeam, next);
-      return next;
-    });
-    setResults(null);
-    setPitcherWarnings((prev) => {
-      const next = new Map(prev);
-      next.delete(id);
-      return next;
-    });
-  };
-
-  const handleFindGames = async () => {
-    if (!selectedTeam || selectedPitchers.length === 0) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Fetch home team schedule
-      const scheduleRes = await fetch(
-        `/api/schedule?teamId=${selectedTeam.id}&season=${CURRENT_SEASON}`
-      );
-      const scheduleData = await scheduleRes.json();
-      const allGames: ScheduleGame[] = scheduleData.games || [];
-
-      // Filter to home games only
-      const homeGames = allGames.filter(
-        (g) => g.teams.home.team.id === selectedTeam.id
-      );
-
-      const allMatches: MatchedGame[] = [];
-      const allRotations: RotationInfo[] = [];
-      const warnings = new Map<number, PitcherWarning>();
-
-      await Promise.all(
-        selectedPitchers.map(async (pitcher) => {
-          // Fetch current player info to check roster status
-          const playerRes = await fetch(`/api/player/${pitcher.id}`);
-          const playerData = await playerRes.json();
-          const currentPlayer = playerData.player;
-
-          // Check if traded or released
-          if (currentPlayer?.currentTeam) {
-            if (currentPlayer.currentTeam.id !== pitcher.teamId) {
-              warnings.set(pitcher.id, {
-                type: "traded",
-                message: `Now on ${currentPlayer.currentTeam.name} (was ${pitcher.teamName})`,
-              });
-              // Update pitcher's team for correct series matching
-              pitcher = {
-                ...pitcher,
-                teamId: currentPlayer.currentTeam.id,
-                teamName: currentPlayer.currentTeam.name,
-              };
-            }
-          } else if (currentPlayer && !currentPlayer.currentTeam) {
-            warnings.set(pitcher.id, {
-              type: "inactive",
-              message: "No longer on an active roster",
-            });
-          }
-
-          // Fetch current season game log
-          const logRes = await fetch(
-            `/api/gamelog?playerId=${pitcher.id}&season=${CURRENT_SEASON}`
-          );
-          const logData = await logRes.json();
-          let splits = logData.splits || [];
-
-          const currentSeasonStarts = splits.filter(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (s: any) => s.stat?.gamesStarted === 1
-          );
-
-          // Check for inactivity mid-season
-          if (currentSeasonStarts.length > 0) {
-            const lastStart = currentSeasonStarts
-              .map((s: { date: string }) => s.date)
-              .sort()
-              .pop();
-            const today = new Date().toISOString().split("T")[0];
-            const daysSinceLastStart = Math.round(
-              (new Date(today).getTime() - new Date(lastStart).getTime()) /
-                (1000 * 60 * 60 * 24)
-            );
-            if (daysSinceLastStart > 15 && !warnings.has(pitcher.id)) {
-              warnings.set(pitcher.id, {
-                type: "inactive",
-                message: `Last start was ${lastStart} (${daysSinceLastStart} days ago) — may be on IL`,
-              });
-            }
-          } else {
-            // No starts this season — only flag if season has been underway for 3+ weeks
-            const completedGames = allGames
-              .filter((g) => g.status.detailedState === "Final")
-              .sort((a, b) => a.officialDate.localeCompare(b.officialDate));
-            if (completedGames.length > 0) {
-              const firstGameDate = new Date(completedGames[0].officialDate);
-              const daysSinceSeasonStart = Math.round(
-                (new Date().getTime() - firstGameDate.getTime()) / (1000 * 60 * 60 * 24)
-              );
-              if (daysSinceSeasonStart >= 21 && !warnings.has(pitcher.id)) {
-                warnings.set(pitcher.id, {
-                  type: "no_starts",
-                  message: `No starts in ${CURRENT_SEASON} yet — may be on IL or in minors`,
-                });
-              }
-            }
-          }
-
-          // Fetch previous season if needed
-          if (currentSeasonStarts.length < 3) {
-            const prevRes = await fetch(
-              `/api/gamelog?playerId=${pitcher.id}&season=${CURRENT_SEASON - 1}`
-            );
-            const prevData = await prevRes.json();
-            const prevSplits = prevData.splits || [];
-            splits = [...prevSplits, ...splits];
-          }
-
-          // Fetch the pitcher's team schedule so we can show the projected next opponent
-          let pitcherTeamSchedule: ScheduleGame[] | undefined;
-          try {
-            const teamSchedRes = await fetch(
-              `/api/schedule?teamId=${pitcher.teamId}&season=${CURRENT_SEASON}`
-            );
-            const teamSchedData = await teamSchedRes.json();
-            pitcherTeamSchedule = teamSchedData.games || [];
-          } catch {
-            // skip — projected box will fall back to date-only
-          }
-
-          // Build rotation pattern info from current season data
-          const rotInfo = buildRotationInfo(pitcher, splits, CURRENT_SEASON, pitcherTeamSchedule);
-          allRotations.push(rotInfo);
-
-          const matches = projectPitcherStarts(
-            homeGames,
-            pitcher,
-            splits,
-            CURRENT_SEASON
-          );
-          allMatches.push(...matches);
-        })
-      );
-
-      setPitcherWarnings(warnings);
-      setRotationInfos(allRotations);
-      setResults(allMatches);
-    } catch (err) {
-      console.error("Error finding games:", err);
-      setError("Failed to fetch schedule data. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (!hydrated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
-        <div className="w-8 h-8 border-3 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
+export default function Page() {
+  // The static HTML carries the masthead; everything date- and viewer-specific renders in the browser.
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            MLB Home Game Pitcher Tracker
-          </h1>
-          <p className="text-gray-500 mt-1">
-            Find home games where your favorite opposing pitchers are likely to start
-          </p>
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex flex-col items-center gap-8">
-          {/* Step 1: Team Selection */}
-          <section className="w-full max-w-md">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold">
-                1
-              </span>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Pick your home team
-              </h2>
-            </div>
-            <TeamPicker
-              onSelect={(team) => {
-                setSelectedTeam(team);
-                setResults(null);
-                setPitcherWarnings(new Map());
-                persist(team, selectedPitchers);
-              }}
-              selectedTeam={selectedTeam}
-            />
-          </section>
-
-          {/* Step 2: Pitcher Selection */}
-          {selectedTeam && (
-            <section className="w-full max-w-md">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold">
-                  2
-                </span>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Select opponent starting pitchers
-                </h2>
-              </div>
-              <PitcherSearch
-                selectedPitchers={selectedPitchers}
-                onAdd={handleAddPitcher}
-                onRemove={handleRemovePitcher}
-              />
-            </section>
-          )}
-
-          {/* Find Games Button */}
-          {selectedTeam && selectedPitchers.length > 0 && (
-            <button
-              onClick={handleFindGames}
-              disabled={isLoading}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-8 py-3.5 text-base font-semibold text-white
-                         shadow-md hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed
-                         transition-colors"
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Finding games...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Find Games
-                </>
-              )}
-            </button>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="w-full max-w-2xl rounded-xl bg-red-50 border border-red-200 px-5 py-4 text-red-700">
-              {error}
-            </div>
-          )}
-
-          {/* Step 3: Results */}
-          {results !== null && (
-            <section className="w-full flex flex-col items-center">
-              <div className="flex items-center gap-2 mb-6">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold">
-                  3
-                </span>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Home games at {selectedTeam?.name}
-                </h2>
-              </div>
-              <ScheduleResults
-                games={results}
-                pitchers={selectedPitchers}
-                teamName={selectedTeam?.name || ""}
-                teamAbbreviation={selectedTeam?.abbreviation || ""}
-                pitcherWarnings={pitcherWarnings}
-                rotationInfos={rotationInfos}
-              />
-            </section>
-          )}
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-200 mt-16 py-6">
-        <p className="text-center text-sm text-gray-400">
-          Pitcher projections are estimates based on rotation patterns. Confirmed starters are sourced from MLB.
-        </p>
+    <div className="wrap">
+      {hydrated ? (
+        <App />
+      ) : (
+        <>
+          <Masthead tab="slate" onTab={() => {}} />
+          <p className="booting">Shuffling the deck…</p>
+        </>
+      )}
+      <footer>
+        Data: MLB Stats API (statsapi.mlb.com), no key needed · season stats entering each game · times in your time zone ·
+        projections are estimates · original drawings, no team or league marks · not affiliated with MLB
       </footer>
     </div>
+  );
+}
+
+function App() {
+  const [view, setView] = useView();
+  const [saved, setSaved] = useSaved();
+  const timeZone = viewerTimeZone();
+  const today = todayLocal();
+  const date = view.date ?? today;
+  const urlTeam = teamByAbbr(view.team);
+  const home = (view.tab !== "slate" ? urlTeam : undefined) ?? teamById(saved.teamId ?? undefined);
+  const pitchers = saved.pitchers;
+
+  const rotationKey = home && pitchers.length > 0 ? `${home.id}|${pitchers.map((p) => p.id).join(",")}|${todayET()}` : null;
+  const rotation = useAsync(rotationKey, () => runRotationWatch(home!, pitchers, todayET()));
+
+  // Remember a traded pitcher's new club.
+  useEffect(() => {
+    const updated = rotation.data?.pitchers;
+    if (!updated) return;
+    const changed = updated.some((p) => {
+      const old = saved.pitchers.find((s) => s.id === p.id);
+      return old && old.teamId !== p.teamId;
+    });
+    if (changed) {
+      const byId = new Map(updated.map((p) => [p.id, p]));
+      setSaved({ ...saved, pitchers: saved.pitchers.map((p) => byId.get(p.id) ?? p) });
+    }
+  }, [rotation.data, saved, setSaved]);
+
+  const setTab = useCallback((tab: Tab) => setView({ tab, team: undefined }), [setView]);
+  const addPitcher = (p: SelectedPitcher) => {
+    if (!pitchers.some((x) => x.id === p.id)) setSaved({ ...saved, pitchers: [...pitchers, p] });
+  };
+  const removePitcher = (id: number) => setSaved({ ...saved, pitchers: pitchers.filter((p) => p.id !== id) });
+  const toggleWatch = (p: PitcherLine, side: SlateSide) => {
+    if (pitchers.some((x) => x.id === p.id)) removePitcher(p.id);
+    else addPitcher({ id: p.id, fullName: p.fullName, pitchHand: p.hand || "R", teamId: side.team.id, teamName: side.team.name });
+  };
+  const setHome = (teamId: number | null) => {
+    setSaved({ ...saved, teamId });
+    if (view.team) setView({ team: undefined }, { replace: true });
+  };
+
+  const sheetProps = {
+    pitchers,
+    result: rotation.data,
+    loading: rotation.loading,
+    error: rotation.error,
+    retry: rotation.retry,
+    timeZone,
+  };
+
+  return (
+    <>
+      <Masthead tab={view.tab} onTab={setTab} />
+      {view.tab === "slate" && (
+        <SlateView
+          date={date}
+          today={today}
+          timeZone={timeZone}
+          team={urlTeam}
+          onDate={(d) => setView({ date: d === today ? undefined : d })}
+          onTeam={(id) => setView({ team: teamById(id ?? undefined)?.abbr }, { replace: true })}
+          watched={new Set(pitchers.map((p) => p.id))}
+          onToggleWatch={toggleWatch}
+          sidebar={
+            home && pitchers.length > 0 ? (
+              <RotationSheet {...sheetProps} home={home} compact onMore={() => setTab("rotation")} />
+            ) : (
+              <SetupPrompt home={home} onSetup={() => setTab("pitchers")} />
+            )
+          }
+        />
+      )}
+      {view.tab === "rotation" && <RotationView {...sheetProps} home={home} onSetup={() => setTab("pitchers")} />}
+      {view.tab === "pitchers" && (
+        <PitchersView
+          home={home}
+          pitchers={pitchers}
+          result={rotation.data}
+          onHome={setHome}
+          onAdd={addPitcher}
+          onRemove={removePitcher}
+          onShowWatch={() => setTab("rotation")}
+        />
+      )}
+    </>
   );
 }

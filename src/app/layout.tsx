@@ -1,33 +1,53 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Alfa_Slab_One, Courier_Prime, Oswald } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const slab = Alfa_Slab_One({ weight: "400", subsets: ["latin"], variable: "--f-slab", display: "swap" });
+const cond = Oswald({ subsets: ["latin"], variable: "--f-cond", display: "swap" });
+const mono = Courier_Prime({ weight: ["400", "700"], subsets: ["latin"], variable: "--f-mono", display: "swap" });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const SITE = "https://mlb-probable-starters.vercel.app";
+const TITLE = "Probable Starters";
+const DESCRIPTION =
+  "Who's on the mound today: every MLB game's probable starters with their season lines, plus a rotation watch for the pitchers you want to see.";
 
 export const metadata: Metadata = {
-  title: "MLB Home Game Pitcher Tracker",
-  description: "Find home games where your favorite opposing pitchers are likely to start",
+  metadataBase: new URL(SITE),
+  title: TITLE,
+  description: DESCRIPTION,
+  applicationName: TITLE,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: TITLE,
+    title: `${TITLE} — who's on the mound`,
+    description: DESCRIPTION,
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Two vintage-style baseball cards showing probable starters and their season lines" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${TITLE} — who's on the mound`,
+    description: DESCRIPTION,
+    images: ["/og.png"],
+  },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#d9c8a2" },
+    { media: "(prefers-color-scheme: dark)", color: "#1d2330" },
+  ],
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={`${slab.variable} ${cond.variable} ${mono.variable}`}>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
