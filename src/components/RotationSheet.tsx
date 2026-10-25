@@ -118,16 +118,15 @@ function HomeGame({ g, home, color, timeZone }: { g: MatchedGame; home: Team; co
   return (
     <li>
       <div className="d">
-        <small>
-          {formatYmd(g.date, { weekday: "short" })} · {formatYmd(g.date, { month: "short" })}
-        </small>
+        <small>{formatYmd(g.date, { month: "short" })}</small>
         {Number(g.date.slice(8))}
+        <small>{formatYmd(g.date, { weekday: "short" })}</small>
       </div>
       <div className="m">
         <span className="dot" style={{ background: color }} aria-hidden="true" />
         {opp?.abbr ?? g.opponent} @ {home.abbr} — {lastName(g.pitcher.fullName)}
         <i>
-          {home.abbr} starter: {g.homePitcher ? lastName(g.homePitcher.fullName) : "TBD"} · {time} {zone}
+          {home.abbr} starter: {g.homePitcher ? lastName(g.homePitcher.fullName) : "TBD"} · {g.startTimeTBD ? "time TBD" : `${time} ${zone}`}
           {g.doubleHeader && g.doubleHeader !== "N" ? ` · Gm ${g.gameNumber}` : ""} ·{" "}
           <a href={`https://www.mlb.com/gameday/${g.gamePk}`} target="_blank" rel="noopener noreferrer">
             Gameday<span className="sr-only"> (opens MLB.com)</span>

@@ -42,7 +42,7 @@ export default function RotationView(props: RotationViewProps) {
     );
   }
   return (
-    <div className="single watch">
+    <div className="single">
       <div className="sechead">
         <h2>{home.name} home games</h2>
         <button type="button" className="linkish" onClick={onSetup}>

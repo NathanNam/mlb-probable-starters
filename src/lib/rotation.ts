@@ -44,7 +44,8 @@ export async function runRotationWatch(home: Team, tracked: SelectedPitcher[], t
     const teamId = mlbTeamId(person);
     if (teamId && teamId !== p.teamId) {
       const team = teamById(teamId)!;
-      warnings.set(p.id, { type: "traded", message: `Now with the ${team.name} (was ${p.teamName})` });
+      const was = teamById(p.teamId)?.abbr ?? p.teamName;
+      warnings.set(p.id, { type: "traded", message: `Traded — now ${team.abbr}, was ${was}` });
       return { ...p, teamId, teamName: team.name };
     }
     if (person && !person.currentTeam) {

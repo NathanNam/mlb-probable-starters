@@ -85,3 +85,20 @@ export const PITCHER_COLORS = ["#1f3550", "#b83a2b", "#3d6b45", "#6a3d7a", "#a86
 export function pitcherColor(index: number): string {
   return PITCHER_COLORS[((index % PITCHER_COLORS.length) + PITCHER_COLORS.length) % PITCHER_COLORS.length];
 }
+
+function luminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+}
+
+/** Cream or ink lettering, whichever reads better on a band colour. */
+export function inkOn(hex: string): string {
+  const L = luminance(hex);
+  const vsCream = (luminance("#fffaf0") + 0.05) / (L + 0.05);
+  const vsInk = (L + 0.05) / (luminance("#2a2118") + 0.05);
+  return vsCream >= vsInk ? "#fffaf0" : "#2a2118";
+}

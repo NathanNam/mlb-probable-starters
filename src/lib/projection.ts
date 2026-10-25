@@ -93,6 +93,9 @@ export function groupIntoSeries(games: ScheduleGame[], opponentId: number): Seri
 /** Rotation dates from the last start onward, keeping those from `today` through `until`. */
 export function projectedRotationDates(lastStart: string, gap: number, today: string, until: string): string[] {
   if (daysBetween(lastStart, today) > STALE_AFTER_DAYS) return [];
+  // A rotation never carries over the winter.
+  const seasonEnd = `${seasonFromDate(lastStart)}-11-30`;
+  if (until > seasonEnd) until = seasonEnd;
   const dates: string[] = [];
   let current = lastStart;
   for (let i = 0; i < 200; i++) {
@@ -128,6 +131,7 @@ function makeMatchedGame(game: ScheduleGame, pitcher: SelectedPitcher, confidenc
     gamePk: game.gamePk,
     date: game.officialDate,
     gameDate: game.gameDate,
+    startTimeTBD: game.status.startTimeTBD,
     opponent: game.teams.away.team.name,
     opponentId: game.teams.away.team.id,
     venue: game.venue.name,

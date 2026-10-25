@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { formatGameTime } from "@/lib/dates";
 import type { PitcherLine, SlateGame, SlateSide } from "@/lib/slate";
+import { inkOn } from "@/lib/teams";
 
 interface MatchupCardProps {
   game: SlateGame;
@@ -12,7 +13,7 @@ interface MatchupCardProps {
 function Band({ side, home }: { side: SlateSide; home?: boolean }) {
   const [c1, c2] = side.team.colors;
   return (
-    <div className={`t ${home ? "h" : "a"}`} style={{ "--c1": c1, "--c2": c2 } as CSSProperties}>
+    <div className={`t ${home ? "h" : "a"}`} style={{ "--c1": c1, "--c2": c2, "--on": inkOn(c1) } as CSSProperties}>
       <span className="abbr" aria-hidden="true">{side.team.abbr}</span>
       <span className="club">
         {side.team.club}
@@ -60,13 +61,8 @@ function Arm({
         <div className="nm">
           <div className="last">{p.lastName}</div>
           <div className="first">
-            {p.firstName}
-            {p.hand && (
-              <>
-                {" · "}
-                <b>{p.hand}HP</b>
-              </>
-            )}
+            <span className="fn">{p.firstName}</span>
+            {p.hand && <b>{p.hand}HP</b>}
           </div>
         </div>
         <button
@@ -104,7 +100,8 @@ function Arm({
           </dl>
           <div className="line">
             {postseason && "Reg. season · "}
-            {p.stats.gamesStarted} GS · {p.stats.inningsPitched} IP{p.stats.kPer9 ? ` · ${p.stats.kPer9} K/9` : ""}
+            {p.stats.gamesStarted}&nbsp;GS · {p.stats.inningsPitched}&nbsp;IP
+            {p.stats.kPer9 ? <> · {p.stats.kPer9}&nbsp;K/9</> : null}
           </div>
         </>
       ) : (

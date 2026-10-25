@@ -1,33 +1,27 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Alfa_Slab_One, Courier_Prime, Oswald } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const slab = Alfa_Slab_One({ weight: "400", subsets: ["latin"], variable: "--f-slab", display: "swap" });
+const cond = Oswald({ subsets: ["latin"], variable: "--f-cond", display: "swap" });
+const mono = Courier_Prime({ weight: ["400", "700"], subsets: ["latin"], variable: "--f-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "MLB Home Game Pitcher Tracker",
-  description: "Find home games where your favorite opposing pitchers are likely to start",
+  title: "Probable Starters",
+  description: "Who's on the mound today: every MLB game's probable starters with their season lines, plus a rotation watch for the pitchers you want to see.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#d9c8a2" },
+    { media: "(prefers-color-scheme: dark)", color: "#1d2330" },
+  ],
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={`${slab.variable} ${cond.variable} ${mono.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }

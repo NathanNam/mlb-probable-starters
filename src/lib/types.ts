@@ -67,6 +67,7 @@ export interface MatchedGame {
   gamePk: number;
   date: string; // YYYY-MM-DD
   gameDate: string; // ISO instant
+  startTimeTBD?: boolean;
   opponent: string;
   opponentId: number;
   venue: string;
