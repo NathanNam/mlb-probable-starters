@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Alfa_Slab_One, Courier_Prime, Oswald } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const slab = Alfa_Slab_One({ weight: "400", subsets: ["latin"], variable: "--f-slab", display: "swap" });
@@ -21,7 +22,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${slab.variable} ${cond.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
