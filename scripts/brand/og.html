@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Oswald:wght@500;600;700&family=Courier+Prime:wght@400;700&display=block" rel="stylesheet">
+<style>
+:root{--table:#d9c8a2;--stock:#f5ecd6;--stock-2:#ecdfbf;--paper:#fffaf0;--ink:#2a2118;--soft:#645340;--rule:#b9a57f;--red:#b83a2b;--navy:#1f3550;--mustard:#d9a43a}
+*{box-sizing:border-box}html,body{margin:0}
+body{width:1200px;height:630px;overflow:hidden;background:var(--table);background-image:radial-gradient(rgba(90,60,30,.13) 1.3px,transparent 1.6px);background-size:7px 7px;font-family:Oswald,sans-serif;color:var(--ink);position:relative}
+.pennant{position:absolute;left:0;top:36px;background:var(--red);color:var(--stock);padding:20px 96px 20px 64px;clip-path:polygon(0 0,100% 0,calc(100% - 50px) 50%,100% 100%,0 100%);filter:drop-shadow(0 4px 0 rgba(0,0,0,.2))}
+.pennant::before{content:"";position:absolute;left:0;top:0;bottom:0;width:22px;background:var(--stock-2);opacity:.85}
+h1{margin:0;font:400 58px/1.02 "Alfa Slab One";letter-spacing:.04em;text-shadow:3px 3px 0 rgba(0,0,0,.25)}
+.pennant small{display:block;font:700 16px "Courier Prime";letter-spacing:.14em;margin-top:10px}
+.blurb{position:absolute;left:64px;top:262px;width:420px;font:500 27px/1.25 Oswald;letter-spacing:.01em}
+.blurb em{display:block;margin-top:14px;font:400 17px/1.45 "Courier Prime";font-style:normal;color:#4e4030}
+.blurb b{font-weight:700}
+.url{position:absolute;left:64px;bottom:44px;font:700 20px "Courier Prime";letter-spacing:.08em;color:var(--ink);background:var(--stock);border:2px solid var(--ink);border-radius:10px;padding:8px 14px}
+.card{position:absolute;width:560px;background:var(--stock);border-radius:18px;padding:8px;box-shadow:0 10px 22px -8px rgba(60,40,20,.55),0 2px 3px rgba(60,40,20,.3)}
+.c1{right:52px;top:40px;transform:rotate(2.2deg)}
+.c2{right:96px;top:318px;transform:rotate(-2.5deg)}
+.inner{border:2.5px solid var(--ink);border-radius:12px;overflow:hidden;position:relative}
+.band{display:grid;grid-template-columns:1fr 72px 1fr;height:64px}
+.t{display:flex;align-items:center;gap:10px;padding:0 14px;position:relative;overflow:hidden}
+.t::before{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(0,0,0,.22) 1px,transparent 1.5px);background-size:4px 4px}
+.t::after{content:"";position:absolute;left:0;right:0;bottom:0;height:6px;background:var(--c2)}
+.t.h{flex-direction:row-reverse}
+.abbr{font:400 30px "Alfa Slab One";position:relative;text-shadow:2px 2px 0 rgba(0,0,0,.3)}
+.club{font:600 13px Oswald;letter-spacing:.1em;text-transform:uppercase;position:relative}
+.club i{display:block;font:400 12px "Courier Prime";font-style:normal}
+.mid{background:var(--stock-2)}
+.die{position:absolute;left:50%;top:10px;transform:translateX(-50%) rotate(-4deg);width:70px;height:70px;background:var(--paper);border:2.5px solid var(--ink);border-radius:13px;display:grid;place-items:center;box-shadow:2px 3px 0 rgba(0,0,0,.25);z-index:2}
+.die::before,.die::after{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:var(--red)}
+.die::before{left:7px;top:7px}.die::after{right:7px;bottom:7px}
+.die b{font:700 17px/1 Oswald;text-align:center}.die small{display:block;font:700 10px "Courier Prime";color:var(--soft);margin-top:3px}
+.arms{display:grid;grid-template-columns:1fr 1fr;border-top:2.5px solid var(--ink)}
+.arm{padding:24px 14px 14px}.arm+.arm{border-left:2px dashed var(--rule)}
+.who{display:flex;gap:10px;align-items:center}
+.num{width:42px;height:42px;border-radius:50%;border:2.5px solid var(--ink);display:grid;place-items:center;font:400 18px "Alfa Slab One";background:var(--stock-2)}
+.last{font:700 24px/1 Oswald;text-transform:uppercase}
+.first{font:400 14px "Courier Prime";color:var(--soft)}.first b{color:var(--ink)}
+.grid{margin-top:12px;display:grid;grid-template-columns:1.1fr 1fr 1fr .8fr;border:2px solid var(--ink);border-radius:5px;background:var(--paper)}
+.grid div{text-align:center;padding:4px 0 6px;border-right:1px solid var(--rule)}.grid div:last-child{border:0}
+.grid dt{font:700 10px "Courier Prime";letter-spacing:.12em;color:var(--soft);border-bottom:1px solid var(--rule);margin:0 4px}
+.grid dd{margin:4px 0 0;font:700 17px "Courier Prime"}.hot dd{color:var(--red)}
+</style>
+</head>
+<body>
+<div class="pennant"><h1>PROBABLE<br>STARTERS</h1><small>WHO'S ON THE MOUND · DAILY CARD</small></div>
+<div class="blurb">Every MLB game's <b>probable starters</b>, with the season line each one brings to the mound.<em>Daily slate · postseason aware · a rotation watch for the arms you want to see at your ballpark.</em></div>
+<div class="url">mlb-probable-starters.vercel.app</div>
+
+<div class="card c1"><div class="inner">
+  <div class="band"><div class="t" style="background:#0C2340;color:#fffaf0;--c2:#C4CED4"><span class="abbr">NYY</span><span class="club">Yankees<i>68-55</i></span></div><div class="mid"></div><div class="t h" style="background:#134A8E;color:#fffaf0;--c2:#1D2D5C"><span class="abbr">TOR</span><span class="club">Blue Jays<i>61-64</i></span></div></div>
+  <div class="die"><b>3:07 PM<small>EDT</small></b></div>
+  <div class="arms">
+    <div class="arm"><div class="who"><div class="num">31</div><div><div class="last">Schlittler</div><div class="first">Cam · <b>RHP</b></div></div></div><dl class="grid"><div><dt>W-L</dt><dd>10-6</dd></div><div class="hot"><dt>ERA</dt><dd>2.21</dd></div><div><dt>WHIP</dt><dd>0.93</dd></div><div><dt>K</dt><dd>182</dd></div></dl></div>
+    <div class="arm"><div class="who"><div class="num">63</div><div><div class="last">Fisher</div><div class="first">Braydon · <b>RHP</b></div></div></div><dl class="grid"><div><dt>W-L</dt><dd>3-3</dd></div><div><dt>ERA</dt><dd>3.54</dd></div><div><dt>WHIP</dt><dd>1.23</dd></div><div><dt>K</dt><dd>57</dd></div></dl></div>
+  </div>
+</div></div>
+
+<div class="card c2"><div class="inner">
+  <div class="band"><div class="t" style="background:#12284B;color:#fffaf0;--c2:#FFC52F"><span class="abbr">MIL</span><span class="club">Brewers<i>76-48</i></span></div><div class="mid"></div><div class="t h" style="background:#005A9C;color:#fffaf0;--c2:#EF3E42"><span class="abbr">LAD</span><span class="club">Dodgers<i>74-50</i></span></div></div>
+  <div class="die"><b>4:15 PM<small>PDT</small></b></div>
+  <div class="arms">
+    <div class="arm"><div class="who"><div class="num">32</div><div><div class="last">Misiorowski</div><div class="first">Jacob · <b>RHP</b></div></div></div><dl class="grid"><div><dt>W-L</dt><dd>11-5</dd></div><div class="hot"><dt>ERA</dt><dd>1.76</dd></div><div><dt>WHIP</dt><dd>0.74</dd></div><div><dt>K</dt><dd>204</dd></div></dl></div>
+    <div class="arm"><div class="who"><div class="num">70</div><div><div class="last">Wrobleski</div><div class="first">Justin · <b>LHP</b></div></div></div><dl class="grid"><div><dt>W-L</dt><dd>11-4</dd></div><div><dt>ERA</dt><dd>3.44</dd></div><div><dt>WHIP</dt><dd>1.11</dd></div><div><dt>K</dt><dd>94</dd></div></dl></div>
+  </div>
+</div></div>
+</body>
+</html>
