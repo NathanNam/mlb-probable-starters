@@ -53,7 +53,7 @@ export default function SlateView(props: SlateViewProps) {
               id="slate-find"
               type="search"
               value={query}
-              placeholder="Find a pitcher… e.g. Skenes"
+              placeholder="Find a pitcher…"
               autoComplete="off"
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -68,7 +68,7 @@ export default function SlateView(props: SlateViewProps) {
           <div className="sechead">
             <h2>{formatYmd(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</h2>
             <span>
-              {slate.data ? `${total} game${total === 1 ? "" : "s"} · ` : ""}times in {timeZone.replace(/_/g, " ")}
+              {slate.data ? `${total === 0 ? "No" : total} game${total === 1 ? "" : "s"} · ` : ""}times in {timeZone.replace(/_/g, " ")}
             </span>
           </div>
 
@@ -99,7 +99,7 @@ export default function SlateView(props: SlateViewProps) {
             <p className="note" role="status">Season stats didn&apos;t load; matchups are shown without them.</p>
           )}
 
-          {empty && (
+          {empty && !banner.data && (
             <div className="sheet notice">
               <div className="inner">
                 <h3>No games</h3>

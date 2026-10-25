@@ -1318,19 +1318,30 @@ footer {
     font-size: 13px;
   }
   .banner {
-    margin-top: 12px;
-    padding: 10px 12px;
-    gap: 8px 12px;
+    margin-top: 10px;
+    padding: 9px 11px;
+    gap: 6px 10px;
+    border-width: 2px;
+    border-radius: 11px;
+  }
+  .banner .tag {
+    font-size: 10.5px;
+    padding: 3px 7px;
   }
   .banner .msg {
-    font-size: 15px;
+    font-size: 14px;
+    line-height: 1.3;
     flex-basis: 100%;
+    order: 2;
   }
   .banner .msg em {
-    font-size: 12.5px;
+    font-size: 11.5px;
   }
   .banner button {
-    margin-left: 0;
+    margin-left: auto;
+    order: 1;
+    font-size: 11px;
+    padding: 5px 9px;
   }
   .cols {
     margin-top: 14px;
