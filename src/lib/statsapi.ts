@@ -3,6 +3,7 @@
 
 import type { GameLogSplit, ScheduleGame } from "./types";
 import { getJson } from "./http";
+import { cached } from "./cache";
 import { addDays } from "./dates";
 
 export const STATSAPI = "https://statsapi.mlb.com/api/v1";
@@ -18,8 +19,12 @@ const SCHEDULE_FIELDS = [
   "ifNecessary",
 ].join(",");
 
-export function apiGet<T>(path: string): Promise<T> {
-  return getJson<T>(`${STATSAPI}${path}`);
+/** Two minutes keeps probable pitchers and scores fresh without refetching on every click. */
+const TTL_MS = 2 * 60 * 1000;
+
+export function apiGet<T>(path: string, ttlMs = TTL_MS): Promise<T> {
+  const url = `${STATSAPI}${path}`;
+  return cached(url, ttlMs, () => getJson<T>(url));
 }
 
 export interface ScheduleResponse {
@@ -65,7 +70,7 @@ export interface SeasonInfo {
 
 export async function fetchSeasonInfo(season: number): Promise<SeasonInfo | undefined> {
   try {
-    const data = await apiGet<{ seasons?: SeasonInfo[] }>(`/seasons/${season}?sportId=1`);
+    const data = await apiGet<{ seasons?: SeasonInfo[] }>(`/seasons/${season}?sportId=1`, 60 * 60 * 1000);
     return data.seasons?.[0];
   } catch {
     return undefined; // next year's calendar may not be published yet
