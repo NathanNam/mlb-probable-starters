@@ -133,7 +133,7 @@ export default function MatchupCard({ game, timeZone, watched, onToggleWatch }: 
   const season = game.officialDate.slice(0, 4);
   const where = [game.seriesLabel, game.venue, game.doubleHeader ? `Gm ${game.gameNumber}` : ""].filter(Boolean).join(" · ");
   return (
-    <article className="card" aria-label={`${game.away.team.name} at ${game.home.team.name}`}>
+    <article className={`card${game.isPostseason ? " post" : ""}`} aria-label={`${game.away.team.name} at ${game.home.team.name}`}>
       <div className="inner">
         <div className="band">
           <Band side={game.away} />

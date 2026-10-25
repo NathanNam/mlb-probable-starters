@@ -38,6 +38,9 @@ export default function SlateView(props: SlateViewProps) {
   const slate = useAsync(`slate:${date}`, () => loadSlate(date));
   const empty = slate.data && slate.data.games.length === 0;
   const banner = useAsync(empty ? `banner:${date}:${today}` : null, () => loadBanner(date, date === today));
+  const nextDate =
+    banner.data?.action && (banner.data.tag === "Postseason" || banner.data.tag === "Off day") ? banner.data.action.date : null;
+  const next = useAsync(nextDate ? `slate:${nextDate}` : null, () => loadSlate(nextDate!));
   const shown = slate.data ? filterSlate(slate.data.games, team?.id, query) : [];
   const total = slate.data?.games.length ?? 0;
 
@@ -140,6 +143,27 @@ export default function SlateView(props: SlateViewProps) {
                 <MatchupCard key={g.gamePk} game={g} timeZone={timeZone} watched={watched} onToggleWatch={onToggleWatch} />
               ))}
             </div>
+          )}
+
+          {nextDate && next.data && next.data.games.length > 0 && (
+            <section className="nextup" aria-label="Next games">
+              <div className="sechead">
+                <h2>Next up · {formatYmd(nextDate, { weekday: "short", month: "short", day: "numeric" })}</h2>
+                <span>
+                  {next.data.games.length} game{next.data.games.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="slate">
+                {next.data.games.slice(0, 4).map((g) => (
+                  <MatchupCard key={g.gamePk} game={g} timeZone={timeZone} watched={watched} onToggleWatch={onToggleWatch} />
+                ))}
+              </div>
+              {next.data.games.length > 4 && (
+                <button type="button" className="btn nextall" onClick={() => onDate(nextDate)}>
+                  All {next.data.games.length} games →
+                </button>
+              )}
+            </section>
           )}
         </main>
         <aside className="side">{sidebar}</aside>

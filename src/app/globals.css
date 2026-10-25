@@ -419,6 +419,13 @@ button {
   text-align: center;
 }
 
+.nextup .sechead h2 {
+  font-size: 18px;
+}
+.nextall {
+  margin-top: 14px;
+}
+
 /* ---------- the matchup card ---------- */
 .card {
   position: relative;
@@ -718,6 +725,16 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1 1 auto;
+}
+.card.post .foot {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+.card.post .foot .where {
+  flex-basis: 100%;
+}
+.card.post .foot .stamp {
+  margin-left: auto;
 }
 .foot .stamp,
 .foot a {
@@ -1070,7 +1087,7 @@ button {
 
 /* single-column tabs */
 .single {
-  margin-top: 22px;
+  margin: 22px auto 0;
   max-width: 860px;
   display: flex;
   flex-direction: column;
@@ -1080,7 +1097,7 @@ button {
   margin: 0;
 }
 .setup {
-  margin-top: 22px;
+  margin: 22px auto 0;
   max-width: 640px;
   display: grid;
   gap: 18px;
